@@ -1,11 +1,40 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Crownfall Marches</title><link rel="stylesheet" href="styles.css"></head><body>
-<div id="app">
-<header><div><h1>Crownfall Marches</h1><small>Raise a crown from one border settlement.</small></div><div class="topstats"><span id="day"></span><span id="influence"></span><span id="realm"></span><span id="phase"></span></div><div class="time"><button data-speed="0">Ⅱ</button><button data-speed="0.25" title="Normal — reaction speed">▶</button><button data-speed="1" title="Fast">▶▶</button><button data-speed="4" title="Very fast">▶▶▶</button></div></header>
-<div id="tutorial" class="tutorial hidden"></div>
-<main><section id="mapWrap"><svg id="roads"></svg><div id="map"></div><div id="mapNotice" class="mapNotice hidden"></div><div id="legend"></div></section><aside>
-<nav><button class="tab active" data-tab="settlement">Settlement</button><button class="tab" data-tab="realm">Realm</button><button class="tab" data-tab="diplomacy">Diplomacy</button><button class="tab" data-tab="chronicle">Chronicle</button></nav>
-<div id="panel"></div>
-</aside></main>
-<footer><button id="newGame">New World</button><button id="save">Save</button><button id="load">Load</button><button id="help">How to Play</button><button id="threatPause" title="Automatically pause when an enemy army targets your realm">Threat Pause: ON</button><span id="status">Ready.</span></footer>
-<div id="modal" class="modal hidden"><div class="modalCard"><button id="closeModal" class="close">×</button><div id="modalContent"></div></div></div>
-<script type="module" src="src/app.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Crownfall Marches</title>
+  <style>
+    html,body{margin:0;min-height:100%;background:#151811;color:#e7e0c9;font-family:Georgia,'Times New Roman',serif}
+    #boot{min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center}
+    .card{max-width:420px;padding:20px;border:1px solid #566046;border-radius:10px;background:#20251a}
+    h1{margin:0 0 8px;color:#e3bd64;font-size:24px}.muted{color:#a9a58f;line-height:1.4}
+  </style>
+</head>
+<body>
+  <div id="boot"><div class="card"><h1>Crownfall Marches</h1><div id="bootStatus" class="muted">Loading the Marches…</div></div></div>
+  <script>
+  (async function(){
+    const status=document.getElementById('bootStatus');
+    try{
+      const parts=[];
+      for(let i=1;i<=11;i++){
+        const name='game/part'+String(i).padStart(2,'0')+'.txt?v=122';
+        const r=await fetch(name,{cache:'no-cache'});
+        if(!r.ok) throw new Error('Could not load '+name+' ('+r.status+')');
+        parts.push(await r.text());
+        status.textContent='Loading the Marches… '+i+'/11';
+      }
+      const game=parts.join('');
+      if(!game.includes('Crownfall Marches')||!game.includes('start(\'alder-crown-1\')')) throw new Error('The game package is incomplete.');
+      document.open();
+      document.write(game);
+      document.close();
+    }catch(err){
+      console.error(err);
+      status.innerHTML='Crownfall could not start.<br><br>'+String(err.message||err)+'<br><br>Refresh the page once. If it still fails, tell Kowalski what this message says.';
+    }
+  })();
+  </script>
+</body>
+</html>
