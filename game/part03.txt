@@ -1,0 +1,109 @@
+th:850px){.settlement{width:43px;height:46px}.label{transform:translate(-50%,24px);font-size:8px}.reportUnitGrid{grid-template-columns:1fr}.reportSides{grid-template-columns:1fr}.versus{display:none}.intelGrid{grid-template-columns:1fr}}
+
+
+/* v1.2 fairness + realm administration */
+#phase{white-space:nowrap;color:#d9c786}
+.legendItem small{font-size:9px;color:#bdb79e;margin-left:2px}.legendItem.eliminated{opacity:.4;text-decoration:line-through}
+.realmNote{margin-top:9px;padding:6px 8px;border:1px solid #4a513b;border-radius:4px;background:#171b13;color:#bcb69f;font-size:11px}
+.stewardPolicies{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}.stewardPolicies button{font-size:11px;padding:5px 8px}.stewardPolicies button.active{background:#d0b25c;color:#17180f;border-color:#f0d98a}
+.fallenFaction{opacity:.48}.fallenFaction .tag{background:#382c28;color:#c89a90}
+#threatPause{border-color:#77643b;color:#e8d497}#threatPause:hover{border-color:#c5a553}
+.goalAlt{margin-top:7px;padding:7px;border-radius:4px;background:#171b13;color:#bdb69f;font-size:11px}.goalAlt b{color:#edd78c}
+@media(max-width:1050px){.topstats{gap:8px}.topstats span{padding:6px 7px;font-size:12px}}
+
+/* v1.2.1 mobile + touch responsive pass */
+/* Reset legacy node shells now that settlements use illustrated SVG towns. */
+.settlement.playerRealm,.settlement.alliedRealm,.settlement.enemyRealm,.settlement.foreignRealm,.settlement.neutral{background:transparent!important;border:0;box-shadow:none;color:inherit}
+
+html,body,#app{max-width:100%;}
+#app{height:100%;}
+button,select,input{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.mobileSettlementNav{display:none}
+
+@media (pointer:coarse){
+  button{min-height:44px;min-width:44px}
+  nav button{min-height:46px}
+  .actions button,.stewardPolicies button,.chronicleFilters button,.reportButton{min-height:44px;padding:9px 11px}
+  .mission select,.mission input{min-height:44px;font-size:16px}
+  .settlement{width:50px;height:52px}
+  .settlement .settlementArt{width:38px;height:41px;margin:auto}
+  .settlementPortrait .settlementArt{width:62px;height:62px}
+}
+
+@media (max-width:900px){
+  html,body{height:100%;min-height:100%;overflow:hidden}
+  body{overscroll-behavior:none}
+  #app{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  header{height:auto;min-height:0;padding:7px 8px;gap:6px;flex-wrap:wrap}
+  header>div:first-child{min-width:0;flex:1}
+  h1{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header small{display:none}
+  .time{gap:4px;margin-left:auto}
+  .time button{padding:7px 9px;min-width:42px}
+  .topstats{order:3;width:100%;margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;font-size:10px}
+  .topstats span{padding:5px 4px;font-size:10px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  main{height:auto;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:minmax(260px,52%) minmax(0,48%)}
+  #mapWrap{height:auto;min-height:0;overflow:hidden}
+  aside{height:auto;min-height:0;border-left:0;border-top:1px solid var(--line);overflow:hidden}
+  nav{flex:0 0 auto;position:sticky;top:0;z-index:10;background:#1a1e16}
+  nav button{padding:8px 3px;font-size:11px}
+  #panel{padding:8px;padding-bottom:calc(12px + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+  .card{padding:9px;margin-bottom:7px;border-radius:7px}
+  .card h2{font-size:18px}.card h3{font-size:14px;margin-bottom:6px}
+  .settlementHeader{gap:9px;min-height:70px}
+  .settlementPortrait{width:58px;height:58px;flex-basis:58px}
+  .settlementPortrait .settlementArt{width:52px;height:52px}
+  .defenseReadout{margin-top:4px;font-size:12px}
+  .resourceGrid,.miniGrid{gap:4px}.resource{padding:6px 3px;font-size:10px}.resource strong{font-size:12px}
+  .mobileSettlementNav{display:grid;position:sticky;top:0;z-index:9;grid-template-columns:repeat(4,1fr);gap:4px;margin:-1px 0 7px;padding:4px;background:#1a1e16eF;border:1px solid #3a4230;border-radius:7px;backdrop-filter:blur(5px)}
+  .mobileSettlementNav button{min-width:0;min-height:40px;padding:7px 3px;font-size:10px}
+  .mobileSection{scroll-margin-top:54px}
+  .building,.unitRow,.dipRow{padding:7px 0;gap:6px}
+  .building .desc{font-size:10px;line-height:1.2}
+  .building>button{min-width:76px}
+  .unitStats{display:block;margin:2px 0 0;font-size:9px}
+  .costReadable{gap:3px;margin-top:4px}.costChip{padding:3px 5px;font-size:10px}
+  .recruitActions{display:grid;grid-template-columns:1fr 1fr;gap:4px;min-width:148px}.recruitActions button{min-width:0;padding:7px 6px;font-size:10px}
+  .mission{grid-template-columns:1fr 1fr;gap:7px}.mission label{font-size:10px}.mission label:nth-child(n+3){min-width:0}
+  #sendArmy{min-height:48px;font-weight:bold}
+  .bigActions{display:grid!important;grid-template-columns:repeat(2,1fr)}.quickOrders .bigActions button{min-width:0}
+  .intelGrid{grid-template-columns:1fr 1fr}.intelGrid>div:last-child{grid-column:1/-1}
+  .battleLink{min-height:48px;gap:8px}
+  .threatRow{font-size:11px;align-items:center}
+  .mapNotice{left:7px;top:7px;max-width:calc(100% - 14px);padding:6px 8px;font-size:10px;line-height:1.2}
+  .mapNotice span{font-size:8px;padding:2px 4px;margin-right:4px}
+  #legend{left:6px;bottom:6px;max-width:66%;max-height:64px;overflow:auto;padding:5px 6px;gap:4px;font-size:8px;border-radius:4px}
+  .legendItem{gap:3px}.legendItem small{font-size:7px}.dot{width:8px;height:8px}
+  .label{font-size:7px;transform:translate(-50%,22px);padding:1px 2px;max-width:72px;overflow:hidden;text-overflow:ellipsis}
+  .label-neutral:not(.label-selected){display:none}
+  .label-selected{display:block!important;color:#fff5c5;background:#2d291ae6;font-weight:bold;z-index:8}
+  .settlement.capital::after{font-size:13px;top:-5px}
+  footer{position:static;height:auto;min-height:48px;display:flex;gap:4px;padding:4px 6px;padding-bottom:calc(4px + env(safe-area-inset-bottom));overflow-x:auto;overflow-y:hidden;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  footer button{flex:0 0 auto;min-height:40px;padding:6px 8px;font-size:10px}
+  #status{display:none}
+  .tutorial{position:fixed;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;max-width:none;max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:14px;font-size:13px}
+  .modal{padding:8px;padding-top:calc(8px + env(safe-area-inset-top));padding-bottom:calc(8px + env(safe-area-inset-bottom));align-items:flex-end}
+  .modalCard{width:100%;max-width:none;max-height:88dvh;border-radius:12px 12px 7px 7px;padding:18px 14px 14px}
+  .close{min-width:44px;min-height:44px;font-size:22px;padding:0}
+  .reportUnitGrid{grid-template-columns:1fr}.reportSides{grid-template-columns:1fr}.versus{display:none}
+}
+
+@media (max-width:850px) and (orientation:portrait){
+  main{grid-template-rows:minmax(280px,54%) minmax(0,46%)}
+}
+
+@media (orientation:landscape) and (max-height:600px){
+  #app{grid-template-rows:auto minmax(0,1fr) auto}
+  header{flex-wrap:nowrap;padding:4px 7px;gap:5px}
+  header>div:first-child{flex:0 0 auto;max-width:175px}
+  h1{font-size:15px}
+  .topstats{order:initial;width:auto;margin-left:auto;display:flex;gap:3px;font-size:9px;overflow:hidden}
+  .topstats span{padding:4px 5px;font-size:9px;max-width:104px}
+  .time{margin-left:0}.time button{min-height:38px;min-width:38px;padding:4px 6px;font-size:11px}
+  main{grid-template-columns:minmax(0,1.35fr) minmax(310px,.65fr);grid-template-rows:1fr}
+  #mapWrap{height:auto;min-height:0}
+  aside{height:auto;min-height:0;border-top:0;border-left:1px solid var(--line)}
+  nav button{min-height:38px;padding:5px 2px;font-size:10px}
+  #panel{padding:6px}
+  .card{padding:7px;margin-bottom:5px}
+  .settlementHeader{min-height:56px}.settlementPortrait{width:48px;height:48px;flex-basis:48px}.settlementPortrait .settlementArt{wid
