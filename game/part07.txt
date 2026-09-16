@@ -1,0 +1,64 @@
+es(policy))return false;w.playerSteward=w.playerSteward||{lastAdminDay:-99,cursor:0};w.playerSteward.policy=policy;return true;}
+function playerDiplomacyAction(w,otherId,action){const p=0;if(otherId===p||!w.factions[otherId])return {ok:false,msg:'Invalid kingdom.'};const rel=getRelation(w,p,otherId),status=getDiplomacy(w,p,otherId),other=w.factions[otherId];
+ if(action==='improve'){if(w.factions[p].influence<12)return {ok:false,msg:'Need 12 influence.'};w.factions[p].influence-=12;setDiplomacy(w,p,otherId,status,rel+18);w.events.push({day:w.day,type:'diplomacy',actors:[p,otherId],text:`The Alder Crown sent envoys to ${other.name}.`});return {ok:true,msg:`Envoys improve relations with ${other.name}.`};}
+ if(action==='war'){if(w.day<FOUNDING_TRUCE_DAYS)return {ok:false,msg:`The Founding Truce prevents wars until day ${FOUNDING_TRUCE_DAYS}.`};setDiplomacy(w,p,otherId,'war',Math.min(rel,-45));w.events.push({day:w.day,type:'diplomacy',actors:[p,otherId],text:`The Alder Crown declared war on ${other.name}.`});return {ok:true,msg:`War declared on ${other.name}.`};}
+ if(action==='peace'){if(status!=='war')return {ok:false,msg:'You are not at war.'};const chance=rel+50+(factionPower(w,p)<factionPower(w,otherId)?20:0);if(chance>25){setDiplomacy(w,p,otherId,'peace',Math.max(-20,rel+25));w.events.push({day:w.day,type:'diplomacy',actors:[p,otherId],text:`The Alder Crown and ${other.name} agreed to peace.`});return {ok:true,msg:`${other.name} accepts peace.`};}return {ok:false,msg:`${other.name} refuses peace.`};}
+ if(action==='alliance'){if(status==='war')return {ok:false,msg:'Make peace first.'};if(rel>=45){setDiplomacy(w,p,otherId,'alliance',rel+10);w.events.push({day:w.day,type:'diplomacy',actors:[p,otherId],text:`The Alder Crown formed an alliance with ${other.name}.`});return {ok:true,msg:`Alliance formed with ${other.name}.`};}return {ok:false,msg:'Relations must reach 45.'};}
+ if(action==='break'){setDiplomacy(w,p,otherId,'peace',rel-25);w.events.push({day:w.day,type:'diplomacy',actors:[p,otherId],text:`The Alder Crown ended its alliance with ${other.name}.`});return {ok:true,msg:`Alliance with ${other.name} ended.`};}
+ return {ok:false,msg:'Unknown diplomatic action.'};}
+function dailyEconomy(w){for(const s of w.settlements){if(s.owner===null)continue;const p=production(s),cap=storageCap(s);for(const k of RESOURCE_KEYS)s.resources[k]=Math.min(cap,s.resources[k]+p[k]);const f=w.factions[s.owner];f.influence=Math.min(999,f.influence+0.22+s.buildings.hall*0.16);}}
+function checkStates(w){for(const f of w.factions){const owns=ownedSettlements(w,f.id).length;f.alive=owns>0;}const playerOwned=ownedSettlements(w,0).length;if(playerOwned===0)w.defeat=true;const rivalMax=Math.max(0,...w.factions.slice(1).map(f=>ownedSettlements(w,f.id).length));const territorial=playerOwned>=Math.ceil(w.settlements.length*0.58);const hegemony=w.day>=FOUNDING_TRUCE_DAYS&&playerOwned>=Math.ceil(w.settlements.length*0.44)&&playerOwned>=Math.max(2,rivalMax*2);if(!w.victory&&(territorial||hegemony)){w.victory=true;w.victoryType=territorial?'territorial':'hegemony';w.events.push({day:w.day,type:'victory',actors:[0],text:territorial?'The Marches recognize your territorial supremacy. The crown is yours.':'No rival realm can challenge your dominance. The Marches accept your hegemony.'});}}
+function advanceDays(w,days=1){const rng=rngFrom(`${w.seed}:${w.day}:tick`);for(let d=0;d<days;d++){w.day++;dailyEconomy(w);runPlayerSteward(w);const arriving=w.armies.filter(a=>a.arriveDay<=w.day);w.armies=w.armies.filter(a=>a.arriveDay>w.day);for(const a of arriving)resolveArmy(w,a,rng);for(let id=1;id<w.factions.length;id++)if(w.day%4===id%4)aiAction(w,id,rng);if(w.day%10===0)checkStates(w);}return w;}
+function serializeWorld(w){return JSON.stringify(w);}
+function deserializeWorld(s){const w=JSON.parse(s);if(w.version!==1)throw new Error('Unsupported save version');if(!Array.isArray(w.battleReports))w.battleReports=[];if(!Number.isInteger(w.nextReportId))w.nextReportId=(w.battleReports.reduce((m,r)=>Math.max(m,r.id||0),0)+1);if(!w.playerSteward)w.playerSteward={policy:'balanced',lastAdminDay:w.day-5,cursor:0};for(const f of w.factions){if(!Number.isFinite(f.lastAdminDay))f.lastAdminDay=w.day-5;if(!Number.isFinite(f.lastMilitaryDay))f.lastMilitaryDay=w.day-9;if(!Number.isFinite(f.adminCursor))f.adminCursor=0;}return w;}
+function worldSummary(w){return {day:w.day,owners:w.factions.map(f=>ownedSettlements(w,f.id).length),armies:w.armies.length,battles:w.stats.battles,annexations:w.stats.annexations,victory:w.victory,defeat:w.defeat};}
+function runAutoplayerAction(w,id=0){
+ const f=w.factions[id],owns=ownedSettlements(w,id);if(!f||!owns.length)return;
+ // QA player models human attention: routine administration is delegated to the steward,
+ // while one frontier receives focused attention per command window.
+ if(id===0&&w.playerSteward?.policy==='off')setPlayerStewardPolicy(w,'balanced');
+ const last=f.lastPlayerMilitaryDay??-99;if(w.day-last<9)return;
+ const active=w.armies.filter(a=>a.owner===id).length;if(active>=Math.min(3,1+Math.floor(owns.length/7)))return;
+ const choices=[];for(const s of owns)for(const n of neighborsOf(w,s.id)){if(n.owner===id)continue;if(n.owner!==null&&w.day<FOUNDING_TRUCE_DAYS)continue;if(n.owner!==null&&getDiplomacy(w,id,n.owner)==='alliance')continue;const need=settlementDefense(n),have=armyPower(s.troops,true);choices.push({s,n,need,have,ratio:have/Math.max(1,need)});}choices.sort((a,b)=>b.ratio-a.ratio||a.need-b.need);
+ if(!choices.length)return;
+ const c=choices[0];
+ // A human can focus one frontier town: make one useful recruit/upgrade decision there before deciding whether to march.
+ const recruitOrder=c.s.buildings.barracks>=2?[['raiders',6],['spears',6],['militia',8]]:[['spears',6],['militia',8]];
+ for(const [u,q] of recruitOrder){if(recruit(w,c.s.id,u,q).ok)break;}
+ let p=armyPower(c.s.troops,true);
+ if(p<=c.need*1.05){for(const b of ['barracks','farms','mine','keep']){if(upgradeBuilding(w,c.s.id,b).ok)break;}f.lastPlayerMilitaryDay=w.day;return;}
+ if(c.n.owner!==null&&getDiplomacy(w,id,c.n.owner)!=='war'){if(w.day<FOUNDING_TRUCE_DAYS)return;setDiplomacy(w,id,c.n.owner,'war',-50);}
+ const units={};for(const k of Object.keys(UNITS))units[k]=Math.floor(c.s.troops[k]*0.74);const r=sendArmy(w,id,c.s.id,c.n.id,units,f.influence>=35?'annex':'raid');if(r.ok)f.lastPlayerMilitaryDay=w.day;
+}
+
+let world;
+let selected=0, activeTab='settlement', speed=.25, last=performance.now(), tickAcc=0, armyDrafts={}, chronicleFilter='all', pauseOnThreat=true, seenEventCount=0;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>Math.floor(n).toLocaleString();
+const owned=()=>world.settlements.filter(s=>s.owner===0);
+const ownerName=s=>s.owner===null?'Independent':world.factions[s.owner].name;
+const toRoman=n=>['0','I','II','III','IV','V','VI','VII','VIII'][n]||n;
+
+const __memoryStore=new Map();
+let __persistentStorage=true;
+function storeGet(key){
+  if(!__persistentStorage)return __memoryStore.has(key)?__memoryStore.get(key):null;
+  try{const v=window.localStorage.getItem(key);if(v!==null)__memoryStore.set(key,v);return v;}
+  catch(e){__persistentStorage=false;return __memoryStore.has(key)?__memoryStore.get(key):null;}
+}
+function storeSet(key,value){
+  const v=String(value);__memoryStore.set(key,v);
+  if(!__persistentStorage)return false;
+  try{window.localStorage.setItem(key,v);return true;}
+  catch(e){__persistentStorage=false;updateStorageUi();return false;}
+}
+function updateStorageUi(){
+  const b=$('#save');if(!b)return;
+  if(__persistentStorage){b.textContent='Save';b.title='Save locally in this browser.';}
+  else{b.textContent='Save (session)';b.title='This iPhone file preview blocks persistent browser storage. Save/Load work while this preview remains open.';}
+}
+function saveStatus(ok,normal='Game saved locally.'){
+  status(ok?normal:'Saved for this open session. iPhone file preview is blocking persistent storage.');
+}
+
+function getArmyDraft(
