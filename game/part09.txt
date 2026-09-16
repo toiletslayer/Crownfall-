@@ -1,0 +1,50 @@
+pe(e)!=='world');if(relevant){const scope=eventScope(relevant);notice.className=`mapNotice ${scope}`;notice.innerHTML=`<span>${scope==='player'?'YOUR REALM':'ALLY'}</span><b>Day ${relevant.day}</b> ${eventIcon(relevant.type)} ${relevant.text}`;notice.classList.remove('hidden');}else notice.classList.add('hidden');}
+}
+
+function nearestOwnedOrigin(targetId){
+  let best=null;for(const s of owned()){const p=shortestPath(world,s.id,targetId);if(!p)continue;const score=p.length;if(!best||score<best.score)best={s,score};}return best?.s||owned()[0]||null;
+}
+function prepareOrder(targetId,mission){
+  const origin=nearestOwnedOrigin(targetId);if(!origin)return status('You have no settlement from which to issue orders.');
+  const d=getArmyDraft(origin);d.target=targetId;d.mission=mission;selected=origin.id;activeTab='settlement';renderAll();status(`${mission[0].toUpperCase()+mission.slice(1)} prepared from ${origin.name} against ${world.settlements[targetId].name}. Choose troop numbers and dispatch.`);
+  $('#armyTarget')?.scrollIntoView({block:'nearest'});
+}
+function intelFor(s){
+  const paths=owned().map(o=>shortestPath(world,o.id,s.id)).filter(Boolean).map(p=>p.length-1);const hops=paths.length?Math.min(...paths):99;
+  if(hops<=1)return 'detailed';if(hops<=3)return 'partial';return 'distant';
+}
+function defenseBand(n){if(n<250)return 'Light';if(n<600)return 'Moderate';if(n<1200)return 'Strong';if(n<2200)return 'Formidable';return 'Massive';}
+function costChips(cost,mult=1){return `<span class="costChip food">🌾 ${cost.food*mult}</span><span class="costChip wood">🪵 ${cost.wood*mult}</span><span class="costChip iron">⛏ ${cost.iron*mult}</span>`;}
+function threatCard(s){
+  const t=incomingThreats().filter(a=>a.target===s.id);if(!t.length)return '';
+  return `<div class="card threatCard"><h3>⚠ Incoming Attack${t.length>1?'s':''}</h3>${t.map(a=>`<div class="threatRow"><div><b>${world.factions[a.owner].name}</b> · ${a.mission}</div><div>${armySize(a.units)} troops · <b>ETA ${Math.max(0,a.arriveDay-world.day)} days</b></div></div>`).join('')}<div class="muted">Your current displayed defense already includes garrison, Keep and Walls.</div></div>`;
+}
+function recentBattles(sid){return (world.battleReports||[]).filter(r=>r.settlementId===sid).slice(-3).reverse();}
+function battleLinks(sid){const reports=recentBattles(sid);if(!reports.length)return '';return `<div class="card"><h3>Recent Battles</h3>${reports.map(r=>`<button class="battleLink" data-report="${r.id}"><span>Day ${r.day}: ${r.outcome}</span><b>View report →</b></button>`).join('')}</div>`;}
+
+function renderPanel(){$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===activeTab));if(activeTab==='settlement')renderSettlement();else if(activeTab==='realm')renderRealm();else if(activeTab==='diplomacy')renderDiplomacy();else renderChronicle();}
+function mobileSettlementNav(mine){return `<div class="mobileSettlementNav" aria-label="Settlement sections"><button data-mobile-jump="resourcesCard">Overview</button><button data-mobile-jump="buildingsCard">Build</button><button data-mobile-jump="garrisonCard">Recruit</button><button data-mobile-jump="${mine?'armyOrders':'quickOrders'}">${mine?'Orders':'Actions'}</button></div>`;}
+function wireMobileJumps(){$$('[data-mobile-jump]').forEach(b=>b.onclick=()=>{const el=$('.'+b.dataset.mobileJump);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});}
+function renderSettlement(){
+  const s=world.settlements[selected],f=s.owner===null?null:world.factions[s.owner],mine=s.owner===0,p=production(s),cap=storageCap(s);
+  let h=`<div class="card settlementHeader"><div class="settlementPortrait">${settlementSvg(s,f)}</div><div><h2>${s.name}</h2><div class="muted">${ownerName(s)} · Keep ${toRoman(s.buildings.keep)} · Walls ${toRoman(s.buildings.walls)}</div><div class="defenseReadout">🛡 Defense <b>${fmt(settlementDefense(s))}</b></div></div></div>${mobileSettlementNav(mine)}`;
+  if(mine)h+=threatCard(s);
+  h+=`<div class="card resourcesCard mobileSection"><div class="resourceGrid"><div class="resource"><strong>🌾 ${fmt(s.resources.food)}</strong>+${p.food.toFixed(1)}/day</div><div class="resource"><strong>🪵 ${fmt(s.resources.wood)}</strong>+${p.wood.toFixed(1)}/day</div><div class="resource"><strong>⛏ ${fmt(s.resources.iron)}</strong>+${p.iron.toFixed(1)}/day</div></div><div class="muted" style="font-size:10px;margin-top:5px">Storage ${fmt(cap)}</div></div>`;
+  h+=`<div class="card buildingsCard mobileSection"><h3>Buildings</h3>`;for(const [k,b] of Object.entries(BUILDINGS)){const lvl=s.buildings[k],cost=costFor(k,lvl+1),max=lvl>=b.max;h+=`<div class="building"><div><b>${b.name} ${toRoman(lvl)}</b><div class="desc">${b.desc}</div>${!max?`<div class="costReadable">${costChips(cost)}</div>`:''}</div>${mine?`<button data-build="${k}" ${max?'disabled':''}>${max?'Max':'Upgrade'}</button>`:''}</div>`;}h+='</div>';
+  h+=`<div class="card garrisonCard mobileSection"><h3>Garrison</h3>`;for(const [k,u] of Object.entries(UNITS)){const n=s.troops[k]||0;h+=`<div class="unitRow"><div><div><b>${u.name}</b> <span class="tag">${n}</span> <span class="unitStats">ATK ${u.atk} · DEF ${u.def}</span></div><div class="unitCostLabel">Cost per unit</div><div class="costReadable">${costChips(u.cost)}</div></div>${mine?`<div class="actions recruitActions"><button data-recruit="${k}" data-q="5">Recruit 5</button><button data-recruit="${k}" data-q="10">Recruit 10</button></div>`:''}</div>`;}h+='</div>';
+  if(mine)h+=armyOrders(s);else h+=foreignActions(s,f);
+  h+=battleLinks(s.id);
+  $('#panel').innerHTML=h;
+  wireMobileJumps();
+  $$('[data-build]').forEach(b=>b.onclick=()=>{const r=upgradeBuilding(world,selected,b.dataset.build);status(r.msg);renderAll();});
+  $$('[data-recruit]').forEach(b=>b.onclick=()=>{const r=recruit(world,selected,b.dataset.recruit,Number(b.dataset.q));status(r.msg);renderAll();});
+  if(mine)wireArmyDraft(s);$('#sendArmy')?.addEventListener('click',sendFromPanel);$('#toDip')?.addEventListener('click',()=>{activeTab='diplomacy';renderPanel();});
+  $$('[data-prepare]').forEach(b=>b.onclick=()=>prepareOrder(s.id,b.dataset.prepare));$$('[data-report]').forEach(b=>b.onclick=()=>showBattleReport(Number(b.dataset.report)));
+}
+function foreignActions(s,f){
+  const intel=intelFor(s),exact=intel==='detailed';const d=settlementDefense(s);const troopText=exact?Object.entries(UNITS).map(([k,u])=>`${u.name} ${s.troops[k]||0}`).join(' · '):`${defenseBand(d)} defenses${intel==='partial'?` · estimated ${Math.round(d/100)*100}`:''}`;
+  return `<div class="card intelCard"><h3>Scouted Intelligence</h3><div class="intelLevel">${intel==='detailed'?'Detailed — border scouts':'partial'===intel?'Partial — nearby reports':'Distant — limited reports'}</div><div class="intelGrid"><div><span>Keep</span><b>${toRoman(s.buildings.keep)}</b></div><div><span>Walls</span><b>${toRoman(s.buildings.walls)}</b></div><div><span>Garrison</span><b>${troopText}</b></div></div></div><div class="card quickOrders mobileSection"><h3>Orders Against ${s.name}</h3><div class="muted">Choose an action here; the game will select your nearest holding as the origin and open Army Orders.</div><div class="actions bigActions"><button data-prepare="raid">Raid</button><button data-prepare="attack">Attack</button><button data-prepare="annex">Annex</button>${f&&f.id!==0?'<button id="toDip">Diplomacy</button>':''}</div></div>`;
+}
+function armyOrders(s){
+  const targets=world.settlements.filter(t=>t.id!==s.id).sort((a,b)=>a.name.localeCompare(b.name));const d=getArmyDraft(s);const opts=targets.map(t=>`<option value="${t.id}" ${t.id===Number(d.target)?'selected':''}>${t.name} — ${ownerName(t)}</option>`).join('');
+  return `<div class="card armyOrders mobileSection"><h3>Army Orders</h3><div class="mission"><label>Target<select id="armyTarget">${opts}</select></label><label>Mission<select id="mission"><option value="raid" ${d.mission==='raid'?'selected':''}>Raid</option><option value="annex" ${d.mission==='annex'?'selected':''}>Anne
