@@ -1,0 +1,54 @@
+h.round(attack),defensePower:Math.round(defense),baseDefense:Math.round(baseDefense),wallLevel:target.buildings.walls,wallMultiplier:Number(wallMultiplier.toFixed(2)),keepLevel:target.buildings.keep,attackerWon:win,outcome:win?'Attacker victory':'Defender victory',loot:null,annexed:false});
+ if(target.owner!==null){const rel=getRelation(w,a.owner,target.owner);setDiplomacy(w,a.owner,target.owner,'war',Math.min(rel,-35));}
+ if(win){
+   if(a.mission==='raid'){
+     const loot={};for(const k of RESOURCE_KEYS){loot[k]=Math.min(target.resources[k],Math.round(90+attack*0.025));target.resources[k]-=loot[k];}
+     report.loot=loot;report.outcome='Successful raid';const home=w.settlements[a.from];if(home&&home.owner===a.owner)for(const k of RESOURCE_KEYS)home.resources[k]+=loot[k];w.stats.raids++;w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} raided ${target.name} and carried off supplies.`});returnSurvivors(w,a,survivors);
+   } else if(a.mission==='annex'){
+     if(attacker.influence>=35 && armySize(survivors)>=6){const old=target.owner;attacker.influence-=35;target.owner=a.owner;target.capital=false;target.buildings.walls=Math.max(0,target.buildings.walls-1);target.troops=survivors;report.annexed=true;report.outcome='Settlement annexed';w.stats.annexations++;w.events.push({day:w.day,type:'conquest',actors:[a.owner,old].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} annexed ${target.name}.`});if(old!==null)w.factions[old].influence=Math.max(0,w.factions[old].influence-12);}
+     else {report.outcome='Battle won; annexation failed';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} won at ${target.name}, but lacked the influence to annex it.`});returnSurvivors(w,a,survivors);}
+   } else {report.outcome='Attackers won the field';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} defeated the defenders at ${target.name}.`});returnSurvivors(w,a,survivors);}
+ } else {report.outcome='Attack repelled';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${target.name} repelled an attack by ${ownerName}.`});}
+}
+function ownedSettlements(w,id){return w.settlements.filter(s=>s.owner===id);}
+function neighborsOf(w,id){const ids=[];for(const [a,b] of w.roads){if(a===id)ids.push(b);else if(b===id)ids.push(a);}return ids.map(x=>w.settlements[x]);}
+function adminPolicyFor(policy='balanced'){
+ if(policy==='economy')return {build:['farms','lumber','mine','keep','hall','barracks','walls'],units:['militia','spears']};
+ if(policy==='defense')return {build:['walls','keep','barracks','farms','lumber','mine','hall'],units:['spears','militia','cavalry']};
+ if(policy==='military')return {build:['barracks','farms','mine','keep','walls','lumber','hall'],units:['raiders','spears','cavalry','militia']};
+ return {build:['farms','lumber','mine','barracks','walls','hall','keep'],units:['spears','militia','raiders','cavalry']};
+}
+function runAdminSlot(w,id,s,rng,policy='balanced'){
+ const prefs=adminPolicyFor(policy);
+ const candidates=prefs.build.filter(b=>s.buildings[b]<BUILDINGS[b].max).sort((a,b)=>s.buildings[a]-s.buildings[b]);
+ for(const b of candidates){if(upgradeBuilding(w,s.id,b).ok)break;}
+ const unitChoices=prefs.units.filter(u=>(u!=='cavalry'||s.buildings.barracks>=3)&&(u!=='raiders'||s.buildings.barracks>=2));
+ for(const u of unitChoices){const qty=2+Math.floor(rng()*4);if(recruit(w,s.id,u,qty).ok)break;}
+}
+function aiAction(w,id,rng){
+ const f=w.factions[id], owns=ownedSettlements(w,id);if(!f||!f.alive||!owns.length)return;w.stats.aiActions++;
+ // Human-scale administration: a realm gets a small capped number of decisions, not one per town.
+ if(w.day-(f.lastAdminDay??-99)>=5){
+   const slots=Math.min(3,1+Math.floor(Math.max(0,owns.length-1)/8));
+   const ordered=owns.slice().sort((a,b)=>(a.buildings.farms+a.buildings.lumber+a.buildings.mine+a.buildings.keep)-(b.buildings.farms+b.buildings.lumber+b.buildings.mine+b.buildings.keep));
+   for(let n=0;n<slots;n++){const s=ordered[(f.adminCursor+n)%ordered.length];if(s)runAdminSlot(w,id,s,rng,'balanced');}
+   f.adminCursor=(f.adminCursor+slots)%Math.max(1,ordered.length);f.lastAdminDay=w.day;
+ }
+ // Diplomacy every ~20 days. Sovereign wars cannot begin during the opening truce.
+ if(w.day>=FOUNDING_TRUCE_DAYS&&w.day%20===id%5){for(const other of w.factions){if(other.id===id||!other.alive)continue;let rel=getRelation(w,id,other.id),status=getDiplomacy(w,id,other.id);const my=factionPower(w,id),op=factionPower(w,other.id);rel+=rng()<0.5?-2:2;if(status==='peace'&&rel>58&&rng()<0.2){setDiplomacy(w,id,other.id,'alliance',rel);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} and ${other.name} formed an alliance.`});}
+ else if(status==='war'&&rel>-20&&rng()<0.3){setDiplomacy(w,id,other.id,'peace',rel+10);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} and ${other.name} agreed to peace.`});}
+ else if(status==='peace'&&rel<-45&&my>op*0.8&&rng()<0.25){setDiplomacy(w,id,other.id,'war',rel-10);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} declared war on ${other.name}.`});}
+ else setDiplomacy(w,id,other.id,status,rel);}}
+ // One strategic dispatch per command window, with a cap on simultaneous offensives.
+ if(w.day-(f.lastMilitaryDay??-99)<8)return;
+ const active=w.armies.filter(a=>a.owner===id).length,maxActive=Math.min(3,1+Math.floor(owns.length/7));if(active>=maxActive)return;
+ const candidates=[];for(const s of owns)for(const n of neighborsOf(w,s.id)){if(n.owner===id)continue;if(n.owner!==null&&w.day<FOUNDING_TRUCE_DAYS)continue;if(n.owner!==null&&getDiplomacy(w,id,n.owner)==='alliance')continue;const need=settlementDefense(n),have=armyPower(s.troops,true);candidates.push({from:s,to:n,need,ratio:have/Math.max(1,need),score:need+(n.owner===null?-160:0)});}
+ if(!candidates.length)return;candidates.sort((a,b)=>b.ratio-a.ratio||a.score-b.score);const pick=candidates[Math.floor(rng()*Math.min(3,candidates.length))];const src=pick.from,tgt=pick.to;for(const [u,q] of (src.buildings.barracks>=2?[['raiders',4],['spears',4],['militia',5]]:[['spears',4],['militia',5]])){if(recruit(w,src.id,u,q).ok)break;}const available=armyPower(src.troops,true);const need=settlementDefense(tgt);if(available<need*0.74){f.lastMilitaryDay=w.day;return;}
+ const frac=available>need*1.7?0.64:0.78,units={};for(const k of Object.keys(UNITS))units[k]=Math.floor(src.troops[k]*frac);const hostile=tgt.owner!==null;const relation=hostile?getRelation(w,id,tgt.owner):0;if(hostile&&getDiplomacy(w,id,tgt.owner)!=='war'&&relation>-40&&rng()<0.6){f.lastMilitaryDay=w.day;return;}
+ const mission=f.influence>=35&&available>need*1.05&&rng()<0.72?'annex':'raid';const sent=sendArmy(w,id,src.id,tgt.id,units,mission);if(sent.ok)f.lastMilitaryDay=w.day;
+}
+function runPlayerSteward(w){
+ const st=w.playerSteward||(w.playerSteward={policy:'balanced',lastAdminDay:-99,cursor:0});if(st.policy==='off')return false;const owns=ownedSettlements(w,0);if(!owns.length||w.day-(st.lastAdminDay??-99)<5)return false;
+ const rng=rngFrom(`steward:${w.seed}:${w.day}`);const slots=Math.min(3,1+Math.floor(Math.max(0,owns.length-1)/8));const ordered=owns.slice().sort((a,b)=>(a.buildings.farms+a.buildings.lumber+a.buildings.mine+a.buildings.keep)-(b.buildings.farms+b.buildings.lumber+b.buildings.mine+b.buildings.keep));for(let n=0;n<slots;n++){const s=ordered[(st.cursor+n)%ordered.length];if(s)runAdminSlot(w,0,s,rng,st.policy);}st.cursor=(st.cursor+slots)%Math.max(1,ordered.length);st.lastAdminDay=w.day;return true;
+}
+function setPlayerStewardPolicy(w,policy){if(!['off','balanced','economy','defense','military'].includ
