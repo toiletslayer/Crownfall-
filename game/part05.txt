@@ -1,0 +1,41 @@
+y(a,b)]?.status||'peace';}
+function setDiplomacy(w,a,b,status,value){const key=relationKey(a,b); w.relations[key]={status,value:clamp(value,-100,100),since:w.day};}
+
+function createWorld(seed='alder-1',count=48){
+ const rng=rngFrom(seed); const positions=generatePositions(rng,count);
+ const factions=FACTION_NAMES.map((name,i)=>({id:i,name,color:FACTION_COLORS[i],isPlayer:i===0,influence:90,alive:true,lastAdminDay:-99,lastMilitaryDay:-99,adminCursor:0}));
+ const settlements=positions.map((p,i)=>({id:i,name:NAMES[i%NAMES.length]+(i>=NAMES.length?` ${Math.floor(i/NAMES.length)+1}`:''),x:p.x,y:p.y,owner:null,capital:false,resources:{food:260+Math.round(rng()*180),wood:220+Math.round(rng()*160),iron:130+Math.round(rng()*100)},buildings:{keep:1,farms:1,lumber:1,mine:1,barracks:1,walls:0,hall:0},troops:{militia:14+Math.floor(rng()*10),spears:0,raiders:0,cavalry:0},prosperity:0.8+rng()*0.4,lastAction:0}));
+ const roads=connectGraph(settlements);
+ // Assign spaced capitals greedily.
+ const chosen=[]; for(let f=0;f<factions.length;f++){let best=null; for(const s of settlements){if(chosen.includes(s.id))continue; const min=chosen.length?Math.min(...chosen.map(id=>dist(s,settlements[id]))):999; if(!best||min>best.min)best={id:s.id,min};} chosen.push(best.id); const s=settlements[best.id]; s.owner=f;s.capital=true;s.buildings={keep:2,farms:2,lumber:2,mine:2,barracks:2,walls:1,hall:1};s.troops={militia:30,spears:12,raiders:8,cavalry:0};s.resources={food:700,wood:620,iron:420};}
+ // Every realm begins from the same one-capital footing. Expansion must be earned on the map.
+ const relations={}; for(let a=0;a<factions.length;a++)for(let b=a+1;b<factions.length;b++){const r=Math.round(-5+rng()*30);relations[relationKey(a,b)]={status:'peace',value:r,since:0};}
+ return {version:1,seed:String(seed),day:0,accumulator:0,nextArmyId:1,nextReportId:1,settlements,roads,factions,relations,armies:[],battleReports:[],events:[{day:0,type:'info',actors:[0],text:`The Founding Truce protects every crown until day ${FOUNDING_TRUCE_DAYS}. All six realms begin with one settlement.`}],victory:false,defeat:false,sandbox:false,playerSteward:{policy:'balanced',lastAdminDay:-99,cursor:0},stats:{battles:0,annexations:0,raids:0,aiActions:0}};
+}
+function canAfford(res,cost,qty=1){return RESOURCE_KEYS.every(k=>res[k]>=((cost[k]||0)*qty));}
+function spend(res,cost,qty=1){for(const k of RESOURCE_KEYS)res[k]-=(cost[k]||0)*qty;}
+function upgradeBuilding(w,sid,building){const s=w.settlements[sid]; if(!s||s.owner===null||!BUILDINGS[building])return {ok:false,msg:'Invalid settlement or building.'}; const lvl=s.buildings[building]; if(lvl>=BUILDINGS[building].max)return {ok:false,msg:'Already at maximum level.'}; const cost=costFor(building,lvl+1); if(!canAfford(s.resources,cost))return {ok:false,msg:'Not enough resources.'}; spend(s.resources,cost); s.buildings[building]++; return {ok:true,msg:`${BUILDINGS[building].name} upgraded to ${s.buildings[building]}.`};}
+function recruit(w,sid,unit,qty){qty=Math.max(1,Math.floor(qty));const s=w.settlements[sid],u=UNITS[unit];if(!s||!u||s.owner===null)return {ok:false,msg:'Invalid recruitment.'}; if(unit==='cavalry'&&s.buildings.barracks<3)return {ok:false,msg:'Cavalry requires Barracks III.'}; if(unit==='raiders'&&s.buildings.barracks<2)return {ok:false,msg:'Raiders require Barracks II.'}; if(!canAfford(s.resources,u.cost,qty))return {ok:false,msg:'Not enough resources.'}; spend(s.resources,u.cost,qty);s.troops[unit]=(s.troops[unit]||0)+qty;return {ok:true,msg:`Recruited ${qty} ${u.name}.`};}
+function sendArmy(w,owner,fromId,toId,units,mission='raid'){
+ const from=w.settlements[fromId],to=w.settlements[toId]; if(!from||!to||from.owner!==owner||fromId===toId)return {ok:false,msg:'Invalid army order.'}; const path=shortestPath(w,fromId,toId); if(!path)return {ok:false,msg:'No route.'};
+ const clean={};let total=0;for(const k of Object.keys(UNITS)){const n=Math.max(0,Math.floor(units[k]||0)); if(n>from.troops[k])return {ok:false,msg:`Not enough ${UNITS[k].name}.`};clean[k]=n;total+=n;} if(total<=0)return {ok:false,msg:'Army is empty.'};
+ if(to.owner!==null&&to.owner!==owner&&w.day<FOUNDING_TRUCE_DAYS)return {ok:false,msg:`The Founding Truce prevents attacks between realms until day ${FOUNDING_TRUCE_DAYS}.`};
+ if(mission==='annex' && owner!==to.owner && w.factions[owner].influence<35)return {ok:false,msg:'Annexation requires 35 influence.'};
+ for(const k of Object.keys(UNITS))from.troops[k]-=clean[k];
+ let d=0;for(let i=0;i<path.length-1;i++)d+=dist(w.settlements[path[i]],w.settlements[path[i+1]]); const avgSpeed=Object.entries(clean).reduce((a,[k,n])=>a+UNITS[k].speed*n,0)/total; const travel=Math.max(3,Math.ceil(d/(1.85*avgSpeed)));
+ const army={id:w.nextArmyId++,owner,from:fromId,target:toId,units:clean,mission,path,departDay:w.day,arriveDay:w.day+travel};w.armies.push(army);
+ if(owner!==0 && to.owner===0 && getDiplomacy(w,0,owner)!=='alliance'){w.events.push({day:w.day,type:'warning',actors:[0,owner],settlement:to.id,armyId:army.id,text:`Scouts report an incoming ${mission} force from ${w.factions[owner].name} bound for ${to.name}. ETA ${travel} days.`});}
+ return {ok:true,msg:`Army dispatched. Arrival in ${travel} days.`,army};
+}
+function applyCasualties(units,ratio){const out={};for(const [k,n] of Object.entries(units))out[k]=Math.max(0,Math.floor(n*(1-ratio)));return out;}
+function unitLosses(before,after){const out={};for(const k of Object.keys(UNITS))out[k]=Math.max(0,(before[k]||0)-(after[k]||0));return out;}
+function addBattleReport(w,data){if(!Array.isArray(w.battleReports))w.battleReports=[];if(!Number.isInteger(w.nextReportId))w.nextReportId=1;const report={id:w.nextReportId++,...data};w.battleReports.push(report);if(w.battleReports.length>500)w.battleReports.splice(0,w.battleReports.length-500);return report;}
+function returnSurvivors(w,army,units){const s=w.settlements[army.from]; if(s&&s.owner===army.owner){for(const k of Object.keys(UNITS))s.troops[k]+=units[k]||0;} else {const owned=w.settlements.find(x=>x.owner===army.owner);if(owned)for(const k of Object.keys(UNITS))owned.troops[k]+=units[k]||0;}}
+function resolveArmy(w,a,rng){
+ const target=w.settlements[a.target], attacker=w.factions[a.owner]; if(!target||!attacker.alive)return;
+ if(target.owner===a.owner){for(const k of Object.keys(UNITS))target.troops[k]+=a.units[k]||0;w.events.push({day:w.day,type:'move',actors:[a.owner],settlement:target.id,text:`Reinforcements reached ${target.name}.`});return;}
+ if(target.owner!==null && getDiplomacy(w,a.owner,target.owner)==='alliance' && a.mission!=='annex'){for(const k of Object.keys(UNITS))target.troops[k]+=a.units[k]||0;w.events.push({day:w.day,type:'move',actors:[a.owner,target.owner],settlement:target.id,text:`Allied reinforcements reached ${target.name}.`});return;}
+ const defenderOwner=target.owner; const attackerBefore=clone(a.units); const defenderBefore=clone(target.troops); const baseDefense=22+target.buildings.keep*9+armyPower(target.troops,false); const wallMultiplier=1+target.buildings.walls*0.18;
+ const attack=armyPower(a.units,true)*(0.9+rng()*0.22); const defense=settlementDefense(target)*(0.9+rng()*0.22); const win=attack>defense;w.stats.battles++;
+ const intensity=clamp(Math.min(attack,defense)/Math.max(attack,defense),0.1,1); const atkLoss=win?0.18+0.38*intensity:0.48+0.45*intensity; const defLoss=win?0.5+0.42*intensity:0.15+0.34*intensity; const survivors=applyCasualties(a.units,clamp(atkLoss,0,0.93)); target.troops=applyCasualties(target.troops,clamp(defLoss,0,0.96)); const defenderAfter=clone(target.troops);
+ const ownerName=attacker.name; const report=addBattleReport(w,{day:w.day,settlementId:target.id,settlementName:target.name,mission:a.mission,attackerOwner:a.owner,defenderOwner,attackerUnits:attackerBefore,defenderUnits:defenderBefore,attackerSurvivors:clone(survivors),defenderSurvivors:defenderAfter,attackerLosses:unitLosses(attackerBefore,survivors),defenderLosses:unitLosses(defenderBefore,defenderAfter),attackPower:Mat
