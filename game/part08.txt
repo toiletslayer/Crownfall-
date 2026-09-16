@@ -1,0 +1,64 @@
+s){
+  const targets=world.settlements.filter(t=>t.id!==s.id).sort((a,b)=>a.name.localeCompare(b.name));
+  let d=armyDrafts[s.id];
+  if(!d){d={target:targets[0]?.id??null,mission:'raid',units:{}};for(const k of Object.keys(UNITS))d.units[k]=Math.floor((s.troops[k]||0)*.7);armyDrafts[s.id]=d;}
+  if(!targets.some(t=>t.id===Number(d.target)))d.target=targets[0]?.id??null;
+  for(const k of Object.keys(UNITS))d.units[k]=Math.max(0,Math.min(s.troops[k]||0,Math.floor(Number(d.units[k]??0))));
+  return d;
+}
+function panelControlActive(){const a=document.activeElement;return !!(a&&$('#panel')?.contains(a)&&(a.tagName==='SELECT'||a.tagName==='INPUT'));}
+function eventScope(e){
+  const actors=Array.isArray(e.actors)?e.actors:[];
+  if(actors.includes(0))return 'player';
+  if(actors.some(id=>id!==null&&id!==0&&getDiplomacy(world,0,id)==='alliance'))return 'ally';
+  const text=String(e.text||'');
+  if(text.includes(world.factions[0].name)||/\byour\b|\bcrown is yours\b/i.test(text))return 'player';
+  for(const f of world.factions.slice(1))if(getDiplomacy(world,0,f.id)==='alliance'&&text.includes(f.name))return 'ally';
+  return 'world';
+}
+function eventIcon(type){return type==='conquest'?'♜':type==='battle'?'⚔':type==='warning'?'⚠':type==='diplomacy'?'✦':type==='move'?'➜':type==='victory'?'★':'•';}
+function renderTick(){renderHeader();renderMap();if(!(activeTab==='settlement'&&panelControlActive()))renderPanel();}
+function status(t){$('#status').textContent=t;}
+
+function start(seed='crown-'+Math.floor(Math.random()*999999)){
+  world=createWorld(seed);armyDrafts={};chronicleFilter='all';speed=.25;seenEventCount=world.events.length;selected=world.settlements.find(s=>s.owner===0).id;
+  const persisted=storeSet('crownfall-autosave',serializeWorld(world));renderAll();showTutorial();updateStorageUi();status(persisted?`New world: ${seed}`:`New world: ${seed} · iPhone preview mode: saves are session-only`);
+}
+function showTutorial(){
+  if(storeGet('crownfall-tutorial-seen'))return;
+  const t=$('#tutorial');t.classList.remove('hidden');
+  t.innerHTML=`<b>Six crowns. Six equal starts.</b><br><br>Every kingdom begins with exactly one capital. The <b>Founding Truce lasts until day ${FOUNDING_TRUCE_DAYS}</b>, so everyone must expand into independent settlements before sovereign wars begin.<br><br>1. Grow Farms, Lumber and Mine.<br>2. Raise troops and take nearby independent settlements.<br>3. Use the <b>Realm Steward</b> to automate routine development as your realm grows.<br>4. Incoming enemy armies can automatically pause the clock so you can react.<br>5. Hold 58% of the Marches to win.<br><br>You are not expected to click faster than the AI anymore.<button id="gotIt">Begin</button>`;
+  $('#gotIt').onclick=()=>{t.classList.add('hidden');storeSet('crownfall-tutorial-seen','1');};
+}
+function renderAll(){renderHeader();renderMap();renderPanel();}
+function renderHeader(){
+  $('#day').textContent=`Day ${world.day}`;$('#influence').textContent=`✦ ${Math.floor(world.factions[0].influence)} Influence`;$('#realm').textContent=`♜ ${owned().length}/${world.settlements.length} Settlements`;$('#phase').textContent=world.day<FOUNDING_TRUCE_DAYS?`☮ Truce ${FOUNDING_TRUCE_DAYS-world.day}d`:'⚔ Open conflict';
+  $$('.time button').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===speed));
+}
+
+function settlementSvg(s,faction){
+  const c=faction?.color||'#aaa58d', keep=s.buildings.keep, wall=s.buildings.walls;
+  const extra=keep>=4?'<rect x="26" y="18" width="8" height="17" rx="1"/><path d="M25 18l5-6 5 6z"/>':'';
+  const wallShape=wall?'<path class="wallShape" d="M5 35h32v5H5zM7 31h5v6H7zm9 0h5v6h-5zm9 0h5v6h-5zm9 0h3v6h-3z"/>':'';
+  return `<svg class="settlementArt" viewBox="0 0 42 44" aria-hidden="true" style="--realm:${c}"><ellipse class="settleShadow" cx="21" cy="40" rx="16" ry="3"/><g class="townFill"><rect x="8" y="21" width="11" height="15" rx="1"/><path d="M6 21l7.5-8 7.5 8z"/><rect x="20" y="16" width="9" height="20" rx="1"/><path d="M18 16l6.5-8 6.5 8z"/>${extra}</g><g class="townWindows"><rect x="11" y="26" width="3" height="4"/><rect x="23" y="22" width="3" height="4"/></g>${wallShape}</svg>`;
+}
+function terrainDecorHtml(){
+  let out='';
+  for(let i=0;i<world.settlements.length;i+=4){const s=world.settlements[i],kind=(i/4)%3;const x=Math.max(2,Math.min(96,s.x+(kind===0?-4:kind===1?5:-2))),y=Math.max(4,Math.min(94,s.y+(kind===0?5:kind===1?-5:6)));if(kind===0)out+=`<span class="terrain forest" style="left:${x}%;top:${y}%">♠♠♠</span>`;else if(kind===1)out+=`<span class="terrain hills" style="left:${x}%;top:${y}%">⌁⌁</span>`;else out+=`<span class="terrain scrub" style="left:${x}%;top:${y}%">✤ ✤</span>`;}
+  return `<div class="terrainLayer">${out}<div class="riverWash"></div></div>`;
+}
+function incomingThreats(){return world.armies.filter(a=>a.owner!==0&&world.settlements[a.target]?.owner===0&&getDiplomacy(world,0,a.owner)!=='alliance').sort((a,b)=>a.arriveDay-b.arriveDay);}
+function renderMap(){
+  const map=$('#map'),roads=$('#roads');map.innerHTML=terrainDecorHtml();roads.innerHTML='';
+  for(const [a,b] of world.roads){const A=world.settlements[a],B=world.settlements[b];const ownedRoad=A.owner===0||B.owner===0?' road-player':'';roads.insertAdjacentHTML('beforeend',`<line class="road${ownedRoad}" x1="${A.x}%" y1="${A.y}%" x2="${B.x}%" y2="${B.y}%"/>`);}
+  const threats=incomingThreats();const threatened=new Set(threats.map(a=>a.target));
+  for(const s of world.settlements){
+    const faction=s.owner===null?null:world.factions[s.owner];let stance='neutral';if(s.owner===0)stance='playerRealm';else if(s.owner!==null){const d=getDiplomacy(world,0,s.owner);stance=d==='alliance'?'alliedRealm':d==='war'?'enemyRealm':'foreignRealm';}
+    const el=document.createElement('button');el.type='button';el.className=`settlement ${stance} ${s.capital?'capital':''} ${s.id===selected?'selected':''} ${threatened.has(s.id)?'incomingThreat':''}`;el.dataset.id=s.id;el.style.left=s.x+'%';el.style.top=s.y+'%';el.title=`${s.name} — ${ownerName(s)}\nDefense ${Math.floor(settlementDefense(s))}`;el.innerHTML=settlementSvg(s,faction);el.onclick=()=>{selected=s.id;activeTab='settlement';renderAll();};map.appendChild(el);
+    const lab=document.createElement('div');lab.className=`label ${s.owner===0?'label-player':s.owner===null?'label-neutral':'label-foreign'} ${s.id===selected?'label-selected':''}`;lab.style.left=s.x+'%';lab.style.top=s.y+'%';lab.textContent=s.name;map.appendChild(lab);
+  }
+  for(const a of world.armies){const A=world.settlements[a.from],B=world.settlements[a.target];const total=Math.max(1,a.arriveDay-a.departDay),p=Math.max(0,Math.min(1,(world.day-a.departDay)/total));const x=A.x+(B.x-A.x)*p,y=A.y+(B.y-A.y)*p;const stance=a.owner===0?'playerArmy':getDiplomacy(world,0,a.owner)==='alliance'?'alliedArmy':getDiplomacy(world,0,a.owner)==='war'?'enemyArmy':'foreignArmy';const el=document.createElement('div');el.className=`army ${stance}`;el.style.left=x+'%';el.style.top=y+'%';el.style.background=world.factions[a.owner].color;el.title=`${world.factions[a.owner].name} — ${a.mission} — ${armySize(a.units)} troops — ETA ${Math.max(0,a.arriveDay-world.day)}d`;map.appendChild(el);}
+  $('#legend').innerHTML=world.factions.map(f=>{const lands=world.settlements.filter(s=>s.owner===f.id).length;return `<span class="legendItem ${lands?'':'eliminated'}"><i class="dot" style="background:${f.color}"></i>${f.name} <small>${lands?lands+' lands':'fallen'}</small></span>`;}).join('')+'<span class="legendItem"><i class="dot" style="background:#aaa58d"></i>Independent</span>';
+  const notice=$('#mapNotice');
+  if(threats.length){const a=threats[0],target=world.settlements[a.target];notice.className='mapNotice threat';notice.innerHTML=`<span>⚠ INCOMING</span><b>${target.name}</b> ${world.factions[a.owner].name} ${a.mission} force · ${armySize(a.units)} troops · ETA ${Math.max(0,a.arriveDay-world.day)} days`;notice.classList.remove('hidden');}
+  else{const relevant=[...world.events].reverse().find(e=>eventSco
