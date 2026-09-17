@@ -19,7 +19,7 @@
     try{
       const parts=[];
       for(let i=1;i<=11;i++){
-        const name='game/part'+String(i).padStart(2,'0')+'.txt?v=130';
+        const name='game/part'+String(i).padStart(2,'0')+'.txt?v=131';
         const r=await fetch(name,{cache:'no-cache'});
         if(!r.ok) throw new Error('Could not load '+name+' ('+r.status+')');
         parts.push(await r.text());
@@ -27,7 +27,7 @@
       }
       const game=parts.join('');
       if(!game.includes('Crownfall Marches')||!game.includes('start(\'alder-crown-1\')')) throw new Error('The game package is incomplete.');
-      const patch='<script src="v13-patch.js?v=130"><\\/script>';
+      const patch='<scr'+'ipt src="v13-patch.js?v=131"></scr'+'ipt>';
       const built=game.replace('</body></html>',patch+'</body></html>');
       document.open();
       document.write(built);
