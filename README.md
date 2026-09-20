@@ -1,4 +1,4 @@
-# Crownfall Marches v1.3
+# Crownfall Marches v1.4
 
 A single-player browser strategy game about building one settlement into a regional power through development, recruitment, diplomacy, raiding, and conquest.
 
@@ -9,6 +9,19 @@ A single-player browser strategy game about building one settlement into a regio
 The GitHub Pages build is the recommended version on phones and tablets. It runs entirely in the browser with no paid APIs, accounts, or game server.
 
 The standalone HTML build remains available for desktop/offline use.
+
+## v1.4 semi-realistic map + mobile workspace
+
+This pass focuses on the two biggest presentation issues found during phone playtesting.
+
+- **Expanded phone workspace:** Build, Recruit, Orders, Realm, Diplomacy, and Chronicle automatically give the lower panel substantially more of the screen instead of forcing gameplay through a tiny scroll window. A **Map** button restores the larger map view.
+- **Single-row mobile footer:** utility controls no longer wrap onto a second row and steal vertical space; the footer scrolls horizontally when needed.
+- **Cleaner mobile labels:** most ordinary foreign and independent settlement labels are hidden on phones while capitals, the selected settlement, and important context remain readable.
+- **Compact territory legend:** house land counts remain visible but use a thin horizontal scrolling strip instead of covering a large section of the map.
+- **Detailed settlements:** villages are now illustrated with stone keeps, plaster/timber houses, roofs, windows, fields, local roads, trees, quarry rocks, barracks, banners, and walls. Their appearance changes with actual building levels.
+- **Richer campaign terrain:** generated forests, farmland, hill contours, lowlands, ponds, an irregular river, parchment-like land variation, and stronger worn-road treatment give each generated world a more grounded map feel.
+- **Existing v1.3 features remain:** House Calder / Vale / Harker / Fenner / Morcant / Bellamy, moving faction flags, and the optional original ambient soundtrack.
+
 
 ## v1.3 presentation pass
 
