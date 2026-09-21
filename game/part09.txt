@@ -49,7 +49,7 @@ function updateMapTick(){
     el.classList.toggle('label-foreign',s.owner!==null&&s.owner!==0);
     el.classList.toggle('label-selected',id===selected);
   });
-  const roadEls=$('#roads .road');
+  const roadEls=document.querySelectorAll('#roads .road');
   roadEls.forEach((el,i)=>{const edge=world.roads[i];if(!edge)return;const A=world.settlements[edge[0]],B=world.settlements[edge[1]];el.classList.toggle('road-player',A.owner===0||B.owner===0);});
   $('#legend').innerHTML=world.factions.map(f=>{const lands=world.settlements.filter(s=>s.owner===f.id).length;return `<span class="legendItem ${lands?'':'eliminated'}"><i class="dot" style="background:${f.color}"></i>${f.name} <small>${lands?lands+' lands':'fallen'}</small></span>`;}).join('')+'<span class="legendItem"><i class="dot" style="background:#aaa58d"></i>Independent</span>';
   map.querySelectorAll('.army').forEach(el=>el.remove());
