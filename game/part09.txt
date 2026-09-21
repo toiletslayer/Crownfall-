@@ -5,8 +5,7 @@
 
 let lastMapStructureSig='';
 function mapStructureSig(){
-  const diplomacy=world.factions.map((f,i)=>i===0?'self':getDiplomacy(world,0,i)).join(',');
-  return String(world.seed)+'|'+world.settlements.map(s=>s.owner===null?'n':s.owner).join(',')+'|'+diplomacy;
+  return String(world.seed)+'|'+world.settlements.length+'|'+world.roads.length;
 }
 function syncMapNotice(threats){
   const notice=$('#mapNotice'); if(!notice)return;
@@ -31,15 +30,28 @@ function updateMapTick(){
   if(!map.querySelector('.settlement')||sig!==lastMapStructureSig){renderMap();return;}
   const threats=incomingThreats(),threatened=new Set(threats.map(a=>a.target));
   map.querySelectorAll('.settlement').forEach(el=>{
-    const id=Number(el.dataset.id);
+    const id=Number(el.dataset.id),s=world.settlements[id]; if(!s)return;
+    let stance='neutral';
+    if(s.owner===0)stance='playerRealm';
+    else if(s.owner!==null){const d=getDiplomacy(world,0,s.owner);stance=d==='alliance'?'alliedRealm':d==='war'?'enemyRealm':'foreignRealm';}
+    ['neutral','playerRealm','alliedRealm','enemyRealm','foreignRealm'].forEach(k=>el.classList.toggle(k,k===stance));
+    el.classList.toggle('capital',!!s.capital);
     el.classList.toggle('selected',id===selected);
     el.classList.toggle('incomingThreat',threatened.has(id));
+    el.title=`${s.name} — ${ownerName(s)}\nDefense ${Math.floor(settlementDefense(s))}`;
   });
-  map.querySelectorAll('.label').forEach((el,i)=>{
+  map.querySelectorAll('.label').forEach(el=>{
     const prev=el.previousElementSibling;
-    const id=prev?.classList?.contains('settlement')?Number(prev.dataset.id):NaN;
+    const id=prev?.classList?.contains('settlement')?Number(prev.dataset.id):NaN,s=world.settlements[id];
+    if(!s)return;
+    el.classList.toggle('label-player',s.owner===0);
+    el.classList.toggle('label-neutral',s.owner===null);
+    el.classList.toggle('label-foreign',s.owner!==null&&s.owner!==0);
     el.classList.toggle('label-selected',id===selected);
   });
+  const roadEls=$('#roads .road');
+  roadEls.forEach((el,i)=>{const edge=world.roads[i];if(!edge)return;const A=world.settlements[edge[0]],B=world.settlements[edge[1]];el.classList.toggle('road-player',A.owner===0||B.owner===0);});
+  $('#legend').innerHTML=world.factions.map(f=>{const lands=world.settlements.filter(s=>s.owner===f.id).length;return `<span class="legendItem ${lands?'':'eliminated'}"><i class="dot" style="background:${f.color}"></i>${f.name} <small>${lands?lands+' lands':'fallen'}</small></span>`;}).join('')+'<span class="legendItem"><i class="dot" style="background:#aaa58d"></i>Independent</span>';
   map.querySelectorAll('.army').forEach(el=>el.remove());
   for(const a of world.armies){
     const A=world.settlements[a.from],B=world.settlements[a.target];
