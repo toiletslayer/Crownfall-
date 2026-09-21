@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Crownfall Marches — v1.4.2</title>
+  <title>Crownfall Marches — v1.4.3</title>
   <style>
     html,body{margin:0;min-height:100%;background:#151811;color:#e7e0c9;font-family:Georgia,'Times New Roman',serif}
     #boot{min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center}
@@ -19,7 +19,7 @@
     try{
       const parts=[];
       for(let i=1;i<=11;i++){
-        const name='game/part'+String(i).padStart(2,'0')+'.txt?v=142';
+        const name='game/part'+String(i).padStart(2,'0')+'.txt?v=143';
         const r=await fetch(name,{cache:'no-cache'});
         if(!r.ok) throw new Error('Could not load '+name+' ('+r.status+')');
         parts.push(await r.text());
@@ -28,10 +28,10 @@
       const game=parts.join('');
       if(!game.includes('Crownfall Marches')||!game.includes('start(\'alder-crown-1\')')) throw new Error('The game package is incomplete.');
       const patches=
-        '<scr'+'ipt src="v13-patch.js?v=142"></scr'+'ipt>'+
-        '<scr'+'ipt src="v14-terrain.js?v=142"></scr'+'ipt>'+
-        '<scr'+'ipt src="v14-villages.js?v=142"></scr'+'ipt>'+
-        '<scr'+'ipt src="v14-mobile.js?v=142"></scr'+'ipt>';
+        '<scr'+'ipt src="v13-patch.js?v=143"></scr'+'ipt>'+
+        '<scr'+'ipt src="v14-terrain.js?v=143"></scr'+'ipt>'+
+        '<scr'+'ipt src="v14-villages.js?v=143"></scr'+'ipt>'+
+        '<scr'+'ipt src="v14-mobile.js?v=143"></scr'+'ipt>';
       const built=game.replace('</body></html>',patches+'</body></html>');
       document.open();
       document.write(built);
