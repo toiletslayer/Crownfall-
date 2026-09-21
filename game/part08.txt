@@ -17,7 +17,7 @@ function eventScope(e){
   return 'world';
 }
 function eventIcon(type){return type==='conquest'?'♜':type==='battle'?'⚔':type==='warning'?'⚠':type==='diplomacy'?'✦':type==='move'?'➜':type==='victory'?'★':'•';}
-function renderTick(){renderHeader();renderMap();if(!(activeTab==='settlement'&&panelControlActive()))renderPanel();}
+function renderTick(){renderHeader();updateMapTick();if(!(activeTab==='settlement'&&panelControlActive()))renderPanel();}
 function status(t){$('#status').textContent=t;}
 
 function start(seed='crown-'+Math.floor(Math.random()*999999)){
@@ -30,7 +30,7 @@ function showTutorial(){
   t.innerHTML=`<b>Six crowns. Six equal starts.</b><br><br>Every kingdom begins with exactly one capital. The <b>Founding Truce lasts until day ${FOUNDING_TRUCE_DAYS}</b>, so everyone must expand into independent settlements before sovereign wars begin.<br><br>1. Grow Farms, Lumber and Mine.<br>2. Raise troops and take nearby independent settlements.<br>3. Use the <b>Realm Steward</b> to automate routine development as your realm grows.<br>4. Incoming enemy armies can automatically pause the clock so you can react.<br>5. Hold 58% of the Marches to win.<br><br>You are not expected to click faster than the AI anymore.<button id="gotIt">Begin</button>`;
   $('#gotIt').onclick=()=>{t.classList.add('hidden');storeSet('crownfall-tutorial-seen','1');};
 }
-function renderAll(){renderHeader();renderMap();renderPanel();}
+function renderAll(){renderHeader();if($('#map')?.querySelector('.settlement'))updateMapTick();else renderMap();renderPanel();}
 function renderHeader(){
   $('#day').textContent=`Day ${world.day}`;$('#influence').textContent=`✦ ${Math.floor(world.factions[0].influence)} Influence`;$('#realm').textContent=`♜ ${owned().length}/${world.settlements.length} Settlements`;$('#phase').textContent=world.day<FOUNDING_TRUCE_DAYS?`☮ Truce ${FOUNDING_TRUCE_DAYS-world.day}d`:'⚔ Open conflict';
   $$('.time button').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===speed));
@@ -60,5 +60,4 @@ function renderMap(){
   for(const a of world.armies){const A=world.settlements[a.from],B=world.settlements[a.target];const total=Math.max(1,a.arriveDay-a.departDay),p=Math.max(0,Math.min(1,(world.day-a.departDay)/total));const x=A.x+(B.x-A.x)*p,y=A.y+(B.y-A.y)*p;const stance=a.owner===0?'playerArmy':getDiplomacy(world,0,a.owner)==='alliance'?'alliedArmy':getDiplomacy(world,0,a.owner)==='war'?'enemyArmy':'foreignArmy';const el=document.createElement('div');el.className=`army ${stance}`;el.style.left=x+'%';el.style.top=y+'%';el.style.background=world.factions[a.owner].color;el.title=`${world.factions[a.owner].name} — ${a.mission} — ${armySize(a.units)} troops — ETA ${Math.max(0,a.arriveDay-world.day)}d`;map.appendChild(el);}
   $('#legend').innerHTML=world.factions.map(f=>{const lands=world.settlements.filter(s=>s.owner===f.id).length;return `<span class="legendItem ${lands?'':'eliminated'}"><i class="dot" style="background:${f.color}"></i>${f.name} <small>${lands?lands+' lands':'fallen'}</small></span>`;}).join('')+'<span class="legendItem"><i class="dot" style="background:#aaa58d"></i>Independent</span>';
   const notice=$('#mapNotice');
-  if(threats.length){const a=threats[0],target=world.settlements[a.target];notice.className='mapNotice threat';notice.innerHTML=`<span>⚠ INCOMING</span><b>${target.name}</b> ${world.factions[a.owner].name} ${a.mission} force · ${armySize(a.units)} troops · ETA ${Math.max(0,a.arriveDay-world.day)} days`;notice.classList.remove('hidden');}
-  else{const relevant=[...world.events].reverse().find(e=>eventSco
+  if(threats.length){const a=threats[0],target=world.settlements[a.target];notice.className='mapNotice threat';notice.innerHTML=`<span>⚠ INCOMING</span><b>${target.name}</b> ${world.factions[a.owner].name} ${a.mission} force · ${armySize(a.units)} troops · ETA ${Math.max(0,a.arriveDay-world.day)} days`;notice.classList.remove('hidden');
