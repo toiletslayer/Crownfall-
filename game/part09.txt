@@ -1,4 +1,55 @@
-pe(e)!=='world');if(relevant){const scope=eventScope(relevant);notice.className=`mapNotice ${scope}`;notice.innerHTML=`<span>${scope==='player'?'YOUR REALM':'ALLY'}</span><b>Day ${relevant.day}</b> ${eventIcon(relevant.type)} ${relevant.text}`;notice.classList.remove('hidden');}else notice.classList.add('hidden');}
+}
+  else{const relevant=[...world.events].reverse().find(e=>eventScope(e)!=='world'&&world.day-e.day<=6);if(relevant){const scope=eventScope(relevant);notice.className=`mapNotice ${scope}`;notice.innerHTML=`<span>${scope==='player'?'YOUR REALM':'ALLY'}</span><b>Day ${relevant.day}</b> ${eventIcon(relevant.type)} ${relevant.text}`;notice.classList.remove('hidden');}else notice.classList.add('hidden');}
+  lastMapStructureSig=mapStructureSig();
+}
+
+let lastMapStructureSig='';
+function mapStructureSig(){
+  const diplomacy=world.factions.map((f,i)=>i===0?'self':getDiplomacy(world,0,i)).join(',');
+  return String(world.seed)+'|'+world.settlements.map(s=>s.owner===null?'n':s.owner).join(',')+'|'+diplomacy;
+}
+function syncMapNotice(threats){
+  const notice=$('#mapNotice'); if(!notice)return;
+  if(threats.length){
+    const a=threats[0],target=world.settlements[a.target];
+    notice.className='mapNotice threat';
+    notice.innerHTML=`<span>⚠ INCOMING</span><b>${target.name}</b> ${world.factions[a.owner].name} ${a.mission} force · ${armySize(a.units)} troops · ETA ${Math.max(0,a.arriveDay-world.day)} days`;
+    notice.classList.remove('hidden');
+    return;
+  }
+  const relevant=[...world.events].reverse().find(e=>eventScope(e)!=='world'&&world.day-e.day<=6);
+  if(relevant){
+    const scope=eventScope(relevant);
+    notice.className=`mapNotice ${scope}`;
+    notice.innerHTML=`<span>${scope==='player'?'YOUR REALM':'ALLY'}</span><b>Day ${relevant.day}</b> ${eventIcon(relevant.type)} ${relevant.text}`;
+    notice.classList.remove('hidden');
+  }else notice.className='mapNotice hidden';
+}
+function updateMapTick(){
+  const map=$('#map'); if(!map)return;
+  const sig=mapStructureSig();
+  if(!map.querySelector('.settlement')||sig!==lastMapStructureSig){renderMap();return;}
+  const threats=incomingThreats(),threatened=new Set(threats.map(a=>a.target));
+  map.querySelectorAll('.settlement').forEach(el=>{
+    const id=Number(el.dataset.id);
+    el.classList.toggle('selected',id===selected);
+    el.classList.toggle('incomingThreat',threatened.has(id));
+  });
+  map.querySelectorAll('.label').forEach((el,i)=>{
+    const prev=el.previousElementSibling;
+    const id=prev?.classList?.contains('settlement')?Number(prev.dataset.id):NaN;
+    el.classList.toggle('label-selected',id===selected);
+  });
+  map.querySelectorAll('.army').forEach(el=>el.remove());
+  for(const a of world.armies){
+    const A=world.settlements[a.from],B=world.settlements[a.target];
+    const total=Math.max(1,a.arriveDay-a.departDay),p=Math.max(0,Math.min(1,(world.day-a.departDay)/total));
+    const x=A.x+(B.x-A.x)*p,y=A.y+(B.y-A.y)*p;
+    const stance=a.owner===0?'playerArmy':getDiplomacy(world,0,a.owner)==='alliance'?'alliedArmy':getDiplomacy(world,0,a.owner)==='war'?'enemyArmy':'foreignArmy';
+    const el=document.createElement('div');el.className=`army ${stance}`;el.style.left=x+'%';el.style.top=y+'%';el.style.background=world.factions[a.owner].color;
+    el.title=`${world.factions[a.owner].name} — ${a.mission} — ${armySize(a.units)} troops — ETA ${Math.max(0,a.arriveDay-world.day)}d`;map.appendChild(el);
+  }
+  syncMapNotice(threats);
 }
 
 function nearestOwnedOrigin(targetId){
