@@ -309,7 +309,7 @@ function resolveArmy(w,a,rng){
      if(attacker.influence>=35 && armySize(survivors)>=6){const old=target.owner;attacker.influence-=35;target.owner=a.owner;target.capital=false;target.buildings.walls=Math.max(0,target.buildings.walls-1);target.troops=survivors;report.annexed=true;report.outcome='Settlement annexed';w.stats.annexations++;w.events.push({day:w.day,type:'conquest',actors:[a.owner,old].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} annexed ${target.name}.`});if(old!==null)w.factions[old].influence=Math.max(0,w.factions[old].influence-12);}
      else {report.outcome='Battle won; annexation failed';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} won at ${target.name}, but lacked the influence to annex it.`});returnSurvivors(w,a,survivors);}
    } else {report.outcome='Attackers won the field';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} defeated the defenders at ${target.name}.`});returnSurvivors(w,a,survivors);}
- } else {report.outcome='Attack repelled';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${target.name} repelled an attack by ${ownerName}.`});}
+ } else {report.outcome='Attack repelled';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${target.name} repelled an attack by ${ownerName}.`});returnSurvivors(w,a,survivors);}
 }
 function ownedSettlements(w,id){return w.settlements.filter(s=>s.owner===id);}
 function neighborsOf(w,id){const ids=[];for(const [a,b] of w.roads){if(a===id)ids.push(b);else if(b===id)ids.push(a);}return ids.map(x=>w.settlements[x]);}
@@ -336,7 +336,7 @@ function aiAction(w,id,rng){
    f.adminCursor=(f.adminCursor+slots)%Math.max(1,ordered.length);f.lastAdminDay=w.day;
  }
  // Diplomacy every ~20 days. Sovereign wars cannot begin during the opening truce.
- if(w.day>=FOUNDING_TRUCE_DAYS&&w.day%20===id%5){for(const other of w.factions){if(other.id===id||!other.alive)continue;let rel=getRelation(w,id,other.id),status=getDiplomacy(w,id,other.id);const my=factionPower(w,id),op=factionPower(w,other.id);rel+=rng()<0.5?-2:2;if(status==='peace'&&rel>58&&rng()<0.2){setDiplomacy(w,id,other.id,'alliance',rel);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} and ${other.name} formed an alliance.`});}
+ if(w.day>=FOUNDING_TRUCE_DAYS&&(w.day-id)%20===0){for(const other of w.factions){if(other.id===id||!other.alive)continue;let rel=getRelation(w,id,other.id),status=getDiplomacy(w,id,other.id);const my=factionPower(w,id),op=factionPower(w,other.id);rel+=rng()<0.5?-2:2;if(status==='peace'&&rel>58&&rng()<0.2){setDiplomacy(w,id,other.id,'alliance',rel);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} and ${other.name} formed an alliance.`});}
  else if(status==='war'&&rel>-20&&rng()<0.3){setDiplomacy(w,id,other.id,'peace',rel+10);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} and ${other.name} agreed to peace.`});}
  else if(status==='peace'&&rel<-45&&my>op*0.8&&rng()<0.25){setDiplomacy(w,id,other.id,'war',rel-10);w.events.push({day:w.day,type:'diplomacy',actors:[id,other.id],text:`${f.name} declared war on ${other.name}.`});}
  else setDiplomacy(w,id,other.id,status,rel);}}
