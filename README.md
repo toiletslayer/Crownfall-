@@ -70,9 +70,9 @@ This release specifically addresses the human-vs-AI action-speed imbalance found
 
 ## Core rules
 
-- Farms produce food; Lumber Camps produce wood; Mines produce iron.
+- Farms produce food and set each settlement's troop-supply capacity; Lumber Camps produce wood; Mines produce iron.
 - Upgrade the Keep for storage and defense, Barracks for advanced troops, Walls for defense, Council Hall for influence.
-- Recruit Militia, Spearmen, Raiders, and Cavalry.
+- Recruit Militia, Spearmen, Raiders, and Cavalry. Militia/Spearmen use 1 supply, Raiders 2, and Cavalry 3. Armies in transit continue to use supply from their origin; reinforcements can temporarily leave a destination over capacity, which blocks further recruitment until space is freed.
 - Click any settlement to inspect it. Foreign settlements expose quick Raid / Attack / Annex preparation.
 - Raids steal resources. Annexation costs 35 Influence and captures a settlement after a successful battle with enough survivors.
 - Incoming enemy attacks show destination, force size, mission, and ETA.
