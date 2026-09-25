@@ -479,7 +479,7 @@ function onboardingActive(){return !!world?.onboarding?.active;}
 function onboardingStage(){return onboardingActive()?Number(world.onboarding.stage||0):99;}
 function introUnitVisible(k){return !onboardingActive()||onboardingStage()>=3||k==='militia'||k==='spears';}
 function introVisibleSettlementIds(){
- if(!onboardingActive()||onboardingStage()>=4)return null;
+ if(!onboardingActive()||onboardingStage()>=5)return null;
  const capital=world.settlements.find(s=>s.owner===0)?.id;
  if(capital===undefined)return null;
  if(onboardingStage()<3)return new Set([capital]);
@@ -489,10 +489,10 @@ function introAdvance(stage){
  if(!onboardingActive())return;world.onboarding.stage=Math.max(world.onboarding.stage||0,stage);renderAll();showTutorial();
 }
 function finishFirstHour(){
- if(!onboardingActive())return;world.onboarding.active=false;world.onboarding.stage=5;storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('The Marches are open. Time is running at normal speed; your Realm Steward remains OFF until you enable it.');
+ if(!onboardingActive())return;world.onboarding.active=false;world.onboarding.stage=6;storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('The Marches are open. Time is running at normal speed; your Realm Steward remains OFF until you enable it.');
 }
 function skipFirstHour(){
- if(onboardingActive()){world.onboarding.active=false;world.onboarding.stage=5;}storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('Introduction skipped. Realm Steward remains OFF until you enable it.');
+ if(onboardingActive()){world.onboarding.active=false;world.onboarding.stage=6;}storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('Introduction skipped. Realm Steward remains OFF until you enable it.');
 }
 function start(seed='crown-'+Math.floor(Math.random()*999999)){
   world=createWorld(seed);armyDrafts={};chronicleFilter='all';seenEventCount=world.events.length;selected=world.settlements.find(s=>s.owner===0).id;
@@ -509,8 +509,9 @@ function showTutorial(){
   else if(stage===1)t.innerHTML=`<div class="introKicker">FIRST HOUR · ECONOMY</div><b>Make one deliberate upgrade.</b><br><br>Upgrade <b>Farms</b> once. The building card now shows the exact before/after effect and exact resource cost.<div class="introGoal">Goal: Farms II → III</div><div class="introActions"><button id="introSkip">Skip introduction</button></div>`;
   else if(stage===2)t.innerHTML=`<div class="introKicker">FIRST HOUR · GARRISON</div><b>Now recruit your first troops.</b><br><br>Recruit <b>5 Militia</b>. Raiders and Cavalry are temporarily hidden so you can learn the basic controls without a wall of unit choices.<div class="introGoal">Goal: Recruit 5 Militia</div><div class="introActions"><button id="introSkip">Skip introduction</button></div>`;
   else if(stage===3)t.innerHTML=`<div class="introKicker">FIRST HOUR · NEIGHBORS</div><b>Your local frontier is now visible.</b><br><br>The settlements connected to your capital are its immediate neighbors. Tap an <b>Independent</b> neighbor to inspect its Keep, Walls, and defenses. Time is still paused.<div class="introGoal">Goal: Inspect a nearby Independent settlement</div><div class="introActions"><button id="introSkip">Skip introduction</button></div>`;
-  else t.innerHTML=`<div class="introKicker">FIRST HOUR · THE MARCHES</div><b>Now you can see the whole campaign.</b><br><br>Raid for resources; Annex costs <b>35 Influence</b>. Your Realm Steward is still <b>OFF</b>, so it cannot spend anything behind your back. Turn it on later from the Realm tab when you want automation.<div class="introGoal">The Founding Truce protects sovereign realms until day ${FOUNDING_TRUCE_DAYS}.</div><div class="introActions"><button id="introSkip">Keep paused</button><button id="introFinish">Start the clock</button></div>`;
-  $('#introSkip')?.addEventListener('click',stage>=4?()=>{world.onboarding.active=false;world.onboarding.stage=5;storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');t.classList.add('hidden');renderAll();status('Introduction complete. Time remains paused; Realm Steward is OFF.');}:skipFirstHour);
+  else if(stage===4)t.innerHTML=`<div class="introKicker">FIRST HOUR · ORDERS</div><b>This is a potential target.</b><br><br>Use one of the large <b>Raid / Attack / Annex</b> buttons in its panel. This only prepares an order—it does not send troops yet. Raid steals resources; Annex costs <b>35 Influence</b> if the battle succeeds.<div class="introGoal">Goal: Prepare an order against this neighbor</div><div class="introActions"><button id="introSkip">Skip introduction</button></div>`;
+  else t.innerHTML=`<div class="introKicker">FIRST HOUR · THE MARCHES</div><b>Now you can see the whole campaign.</b><br><br>You know the basic loop: develop your settlement, recruit troops, inspect a neighbor, and prepare an army order. Your Realm Steward is still <b>OFF</b>, so it cannot spend anything behind your back. Turn it on later from the Realm tab when you want automation.<div class="introGoal">The Founding Truce protects sovereign realms until day ${FOUNDING_TRUCE_DAYS}.</div><div class="introActions"><button id="introSkip">Keep paused</button><button id="introFinish">Start the clock</button></div>`;
+  $('#introSkip')?.addEventListener('click',stage>=5?()=>{world.onboarding.active=false;world.onboarding.stage=6;storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');t.classList.add('hidden');renderAll();status('Introduction complete. Time remains paused; Realm Steward is OFF.');}:skipFirstHour);
   $('#introNext')?.addEventListener('click',()=>introAdvance(1));
   $('#introFinish')?.addEventListener('click',finishFirstHour);
 }
@@ -616,7 +617,7 @@ function nearestOwnedOrigin(targetId){
 }
 function prepareOrder(targetId,mission){
   const origin=nearestOwnedOrigin(targetId);if(!origin)return status('You have no settlement from which to issue orders.');
-  const d=getArmyDraft(origin);d.target=targetId;d.mission=mission;selected=origin.id;activeTab='settlement';renderAll();status(`${mission[0].toUpperCase()+mission.slice(1)} prepared from ${origin.name} against ${world.settlements[targetId].name}. Choose troop numbers and dispatch.`);
+  const d=getArmyDraft(origin);d.target=targetId;d.mission=mission;selected=origin.id;activeTab='settlement';if(onboardingActive()&&onboardingStage()===4)world.onboarding.stage=5;renderAll();showTutorial();status(`${mission[0].toUpperCase()+mission.slice(1)} prepared from ${origin.name} against ${world.settlements[targetId].name}. Choose troop numbers and dispatch.`);
   $('#armyTarget')?.scrollIntoView({block:'nearest'});
 }
 function intelFor(s){
