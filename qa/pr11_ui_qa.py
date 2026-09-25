@@ -141,3 +141,14 @@ with sync_playwright() as p:
 
     with open(OUT/"results.json","w") as fh: json.dump(allr,fh,indent=2)
     print(json.dumps(allr,indent=2))
+    hard=[]
+    for r in allr:
+        if r.get("errors"): hard.append(r["profile"]+": browser errors: "+" | ".join(r["errors"]))
+        expected={"0":0,"1":1,"2":2,"3":3,"4":4,"5":5}
+        for k,v in expected.items():
+            got = r["initial"]["stage"] if k=="0" else r["stages"].get(k,{}).get("stage")
+            if got is not None and got!=v: hard.append(f'{r["profile"]}: stage {k} expected {v}, got {got}')
+        if r["stages"].get("5",{}).get("map",{}).get("settlements")!=48:
+            hard.append(r["profile"]+": full map did not reveal 48 settlements")
+    if hard:
+        raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
