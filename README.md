@@ -62,7 +62,7 @@ This release specifically addresses the human-vs-AI action-speed imbalance found
 
 - **All six houses start equally:** one capital each, identical capital development, troops, resources, and influence.
 - **Founding Truce:** through day 99, factions may raid/annex independent settlements but cannot attack another sovereign realm. Open conflict begins on day 100.
-- **AI command limits:** AI realms no longer upgrade and recruit in every settlement simultaneously. Administration is limited to a small number of capped decisions every five days, scaling only modestly with realm size.
+- **AI command limits:** AI realms no longer upgrade and recruit in every settlement simultaneously. Administration is limited to a small number of capped decisions every five days, scaling only modestly with realm size. When a frontier cannot raise a viable force locally, the AI can stage reinforcements from another holding before trying again.
 - **Military command limits:** each AI realm has a strategic dispatch cooldown and a cap on simultaneous field armies.
 - **Realm Steward:** the player's steward can automate routine development and recruitment at the same capped administrative pace used by rivals. Policies: Off, Balanced, Economy, Defense, Military. Balanced is the default.
 - **Threat Pause:** enabled by default. When a hostile army is sent toward your realm during normal play, the clock pauses so you can inspect the threat and react.
