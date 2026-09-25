@@ -234,6 +234,7 @@ function production(s){return {food:7+s.buildings.farms*5, wood:6+s.buildings.lu
 function settlementDefense(s){let p=22+s.buildings.keep*9; for(const [k,u] of Object.entries(s.troops)) p+=(UNITS[k]?.def||0)*u; return p*(1+s.buildings.walls*0.18);}
 function armyPower(units,attack=true){let p=0; for(const [k,n] of Object.entries(units)) p+=(attack?UNITS[k].atk:UNITS[k].def)*n; return p;}
 function armySize(units){return Object.values(units).reduce((a,b)=>a+b,0);}
+function forceForTarget(s,need,targetMult=1.15,minFrac=0.35,maxFrac=0.88){const available=armyPower(s.troops,true);if(available<=0)return {units:{},power:0,frac:0};const frac=clamp((need*targetMult)/Math.max(1,available),minFrac,maxFrac),units={};for(const k of Object.keys(UNITS))units[k]=Math.floor(s.troops[k]*frac);return {units,power:armyPower(units,true),frac};}
 function factionPower(w,id){const f=w.factions[id]; if(!f)return 0; let p=0; for(const s of w.settlements) if(s.owner===id){p+=settlementDefense(s)*0.55+s.buildings.keep*35;} for(const a of w.armies) if(a.owner===id)p+=armyPower(a.units); return p;}
 
 function generatePositions(rng,count){
@@ -344,9 +345,9 @@ function aiAction(w,id,rng){
  if(w.day-(f.lastMilitaryDay??-99)<8)return;
  const active=w.armies.filter(a=>a.owner===id).length,maxActive=Math.min(3,1+Math.floor(owns.length/7));if(active>=maxActive)return;
  const candidates=[];for(const s of owns)for(const n of neighborsOf(w,s.id)){if(n.owner===id)continue;if(n.owner!==null&&w.day<FOUNDING_TRUCE_DAYS)continue;if(n.owner!==null&&getDiplomacy(w,id,n.owner)==='alliance')continue;const need=settlementDefense(n),have=armyPower(s.troops,true);candidates.push({from:s,to:n,need,ratio:have/Math.max(1,need),score:need+(n.owner===null?-160:0)});}
- if(!candidates.length)return;candidates.sort((a,b)=>b.ratio-a.ratio||a.score-b.score);const pick=candidates[Math.floor(rng()*Math.min(3,candidates.length))];const src=pick.from,tgt=pick.to;for(const [u,q] of (src.buildings.barracks>=2?[['raiders',4],['spears',4],['militia',5]]:[['spears',4],['militia',5]])){if(recruit(w,src.id,u,q).ok)break;}const available=armyPower(src.troops,true);const need=settlementDefense(tgt);if(available<need*0.74){f.lastMilitaryDay=w.day;return;}
- const frac=available>need*1.7?0.64:0.78,units={};for(const k of Object.keys(UNITS))units[k]=Math.floor(src.troops[k]*frac);const hostile=tgt.owner!==null;const relation=hostile?getRelation(w,id,tgt.owner):0;if(hostile&&getDiplomacy(w,id,tgt.owner)!=='war'&&relation>-40&&rng()<0.6){f.lastMilitaryDay=w.day;return;}
- const mission=f.influence>=35&&available>need*1.05&&rng()<0.72?'annex':'raid';const sent=sendArmy(w,id,src.id,tgt.id,units,mission);if(sent.ok)f.lastMilitaryDay=w.day;
+ if(!candidates.length)return;candidates.sort((a,b)=>b.ratio-a.ratio||a.score-b.score);const pick=candidates[Math.floor(rng()*Math.min(3,candidates.length))];const src=pick.from,tgt=pick.to;for(const [u,q] of (src.buildings.barracks>=2?[['raiders',4],['spears',4],['militia',5]]:[['spears',4],['militia',5]])){if(recruit(w,src.id,u,q).ok)break;}const need=settlementDefense(tgt),planned=forceForTarget(src,need,1.15,0.35,0.88);if(planned.power<need*0.90){f.lastMilitaryDay=w.day;return;}
+ const hostile=tgt.owner!==null;const relation=hostile?getRelation(w,id,tgt.owner):0;if(hostile&&getDiplomacy(w,id,tgt.owner)!=='war'&&relation>-40&&rng()<0.6){f.lastMilitaryDay=w.day;return;}
+ const mission=f.influence>=35&&planned.power>need*1.05&&rng()<0.72?'annex':'raid';const sent=sendArmy(w,id,src.id,tgt.id,planned.units,mission);if(sent.ok)f.lastMilitaryDay=w.day;
 }
 function runPlayerSteward(w){
  const st=w.playerSteward||(w.playerSteward={policy:'balanced',lastAdminDay:-99,cursor:0});if(st.policy==='off')return false;const owns=ownedSettlements(w,0);if(!owns.length||w.day-(st.lastAdminDay??-99)<5)return false;
@@ -379,10 +380,10 @@ function runAutoplayerAction(w,id=0){
  // A human can focus one frontier town: make one useful recruit/upgrade decision there before deciding whether to march.
  const recruitOrder=c.s.buildings.barracks>=2?[['raiders',6],['spears',6],['militia',8]]:[['spears',6],['militia',8]];
  for(const [u,q] of recruitOrder){if(recruit(w,c.s.id,u,q).ok)break;}
- let p=armyPower(c.s.troops,true);
- if(p<=c.need*1.05){for(const b of ['barracks','farms','mine','keep']){if(upgradeBuilding(w,c.s.id,b).ok)break;}f.lastPlayerMilitaryDay=w.day;return;}
+ const planned=forceForTarget(c.s,c.need,1.18,0.35,0.90);
+ if(planned.power<=c.need){for(const b of ['barracks','farms','mine','keep']){if(upgradeBuilding(w,c.s.id,b).ok)break;}f.lastPlayerMilitaryDay=w.day;return;}
  if(c.n.owner!==null&&getDiplomacy(w,id,c.n.owner)!=='war'){if(w.day<FOUNDING_TRUCE_DAYS)return;setDiplomacy(w,id,c.n.owner,'war',-50);}
- const units={};for(const k of Object.keys(UNITS))units[k]=Math.floor(c.s.troops[k]*0.74);const r=sendArmy(w,id,c.s.id,c.n.id,units,f.influence>=35?'annex':'raid');if(r.ok)f.lastPlayerMilitaryDay=w.day;
+ const mission=f.influence>=35&&planned.power>c.need*1.05?'annex':'raid';const r=sendArmy(w,id,c.s.id,c.n.id,planned.units,mission);if(r.ok)f.lastPlayerMilitaryDay=w.day;
 }
 
 let world;
