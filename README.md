@@ -10,6 +10,21 @@ The GitHub Pages build is the recommended version on phones and tablets. It runs
 
 The standalone HTML build remains available for desktop/offline use.
 
+## v1.4.7 balance + simulation QA
+
+This release is a mechanics/AI quality pass built from repeated seeded campaign testing rather than a blanket difficulty increase.
+
+- **Battle-state correctness:** surviving attackers from repelled battles return to their realm instead of disappearing after being shown in the report.
+- **AI diplomacy cadence:** House Bellamy now receives the same periodic diplomacy processing as the other rival houses.
+- **Deterministic simulation chunks:** advancing multiple days at once now produces the same seeded simulation result as advancing those days individually.
+- **Farm troop supply:** Farms limit supported military population so automated recruitment cannot create unlimited garrisons. Militia/Spearmen use 1 supply, Raiders 2, Cavalry 3.
+- **Composition-aware recruitment:** routine administration now builds mixed armies instead of overwhelmingly recruiting Spearmen; Cavalry appears in normal long campaigns.
+- **AI mustering:** when a frontier force is too weak, rivals can stage reinforcements from another holding before reconsidering the attack.
+- **Extreme-suicide guard:** AI refuses only the most hopeless marches while preserving the more permissive attack behavior that keeps the default game from becoming overly grindy.
+- **No hidden AI bonuses:** rival combat stats and resource production remain governed by the same core rules as the player.
+
+See **BALANCE-QA.md** for measured results, rejected experiments, and remaining known balance questions.
+
 ## v1.4 semi-realistic map + mobile workspace
 
 This pass focuses on the two biggest presentation issues found during phone playtesting.
