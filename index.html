@@ -503,15 +503,18 @@ function start(seed='crown-'+Math.floor(Math.random()*999999)){
 function focusTutorialTarget(stage){
   const panel=$('#panel');if(!panel)return;
   panel.querySelectorAll('.introFocus').forEach(el=>el.classList.remove('introFocus'));
-  let target=null;
-  if(stage===1)target=$('[data-build="farms"]')?.closest('.building');
-  else if(stage===2)target=$('[data-recruit="militia"][data-q="5"]')?.closest('.unitRow');
-  else if(stage===4)target=$('.quickOrders');
-  if(!target)return;
+  let target=null,section=null;
+  if(stage===1){target=$('[data-build="farms"]')?.closest('.building');section=$('.buildingsCard');}
+  else if(stage===2){target=$('[data-recruit="militia"][data-q="5"]')?.closest('.unitRow');section=$('.garrisonCard');}
+  else if(stage===4){target=$('.quickOrders');section=target;}
+  if(!target||!section)return;
   target.classList.add('introFocus');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const p=panel.getBoundingClientRect(),r=target.getBoundingClientRect();
-    if(r.top<p.top+10||r.bottom>p.bottom-10)panel.scrollTop+=r.top-p.top-12;
+    panel.scrollTop=Math.max(0,section.offsetTop-8);
+    requestAnimationFrame(()=>{
+      const p=panel.getBoundingClientRect(),r=target.getBoundingClientRect();
+      if(r.top<p.top+8||r.bottom>p.bottom-8)panel.scrollTop+=r.top-p.top-8;
+    });
   }));
 }
 function showTutorial(){
