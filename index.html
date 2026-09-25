@@ -322,12 +322,23 @@ function adminPolicyFor(policy='balanced'){
  if(policy==='military')return {build:['barracks','farms','mine','keep','walls','lumber','hall'],units:['raiders','spears','cavalry','militia']};
  return {build:['farms','lumber','mine','barracks','walls','hall','keep'],units:['spears','militia','raiders','cavalry']};
 }
+function recruitmentMix(policy='balanced'){
+ if(policy==='economy')return {militia:.30,spears:.45,raiders:.18,cavalry:.07};
+ if(policy==='defense')return {militia:.10,spears:.62,raiders:.13,cavalry:.15};
+ if(policy==='military')return {militia:.06,spears:.24,raiders:.40,cavalry:.30};
+ return {militia:.10,spears:.45,raiders:.30,cavalry:.15};
+}
+function recruitChoice(s,choices,policy){
+ const mix=recruitmentMix(policy),total=Math.max(1,armySize(s.troops));let best=choices[0],bestGap=-Infinity;
+ for(const u of choices){const current=(s.troops[u]||0)/total,gap=(mix[u]||0)-current;if(gap>bestGap){bestGap=gap;best=u;}}
+ return best;
+}
 function runAdminSlot(w,id,s,rng,policy='balanced'){
  const prefs=adminPolicyFor(policy);
  const candidates=prefs.build.filter(b=>s.buildings[b]<BUILDINGS[b].max).sort((a,b)=>s.buildings[a]-s.buildings[b]);
  for(const b of candidates){if(upgradeBuilding(w,s.id,b).ok)break;}
  const unitChoices=prefs.units.filter(u=>(u!=='cavalry'||s.buildings.barracks>=3)&&(u!=='raiders'||s.buildings.barracks>=2));
- for(const u of unitChoices){const qty=2+Math.floor(rng()*4);if(recruit(w,s.id,u,qty).ok)break;}
+ if(unitChoices.length){const preferred=recruitChoice(s,unitChoices,policy),ordered=[preferred,...unitChoices.filter(u=>u!==preferred)];for(const u of ordered){const qty=2+Math.floor(rng()*4);if(recruit(w,s.id,u,qty).ok)break;}}
 }
 function aiAction(w,id,rng){
  const f=w.factions[id], owns=ownedSettlements(w,id);if(!f||!f.alive||!owns.length)return;w.stats.aiActions++;
