@@ -1,4 +1,5 @@
 name: PR11 UI QA
+# rerun after first browser regression fix
 on:
   push:
     branches:
