@@ -624,7 +624,7 @@ function intelFor(s){
   if(hops<=1)return 'detailed';if(hops<=3)return 'partial';return 'distant';
 }
 function defenseBand(n){if(n<250)return 'Light';if(n<600)return 'Moderate';if(n<1200)return 'Strong';if(n<2200)return 'Formidable';return 'Massive';}
-function costChips(cost,mult=1){return `<span class="costChip food" title="Food">🌾 Food ${cost.food*mult}</span><span class="costChip wood" title="Wood">🪵 Wood ${cost.wood*mult}</span><span class="costChip iron" title="Iron">⛏ Iron ${cost.iron*mult}</span>`;}
+function costChips(cost,mult=1){const meta={food:['🌾','Food'],wood:['🪵','Wood'],iron:['⛏','Iron']};return RESOURCE_KEYS.filter(k=>(cost[k]||0)*mult>0).map(k=>`<span class="costChip ${k}" title="${meta[k][1]}">${meta[k][0]} ${meta[k][1]} ${(cost[k]||0)*mult}</span>`).join('');}
 function threatCard(s){
   const t=incomingThreats().filter(a=>a.target===s.id);if(!t.length)return '';
   return `<div class="card threatCard"><h3>⚠ Incoming Attack${t.length>1?'s':''}</h3>${t.map(a=>`<div class="threatRow"><div><b>${world.factions[a.owner].name}</b> · ${a.mission}</div><div>${armySize(a.units)} troops · <b>ETA ${Math.max(0,a.arriveDay-world.day)} days</b></div></div>`).join('')}<div class="muted">Your current displayed defense already includes garrison, Keep and Walls.</div></div>`;
