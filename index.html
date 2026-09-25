@@ -860,7 +860,15 @@ start('alder-crown-1');requestAnimationFrame(loop);
     const vx=b.x-a.x,vy=b.y-a.y,wx=p.x-a.x,wy=p.y-a.y,z=vx*vx+vy*vy,t=z?Math.max(0,Math.min(1,(wx*vx+wy*vy)/z)):0;
     return Math.hypot(p.x-a.x-t*vx,p.y-a.y-t*vy);
   }
-  function riverDistance(p,pts){let m=999;for(let i=0;i<pts.length-1;i++)m=Math.min(m,pointSegDistance(p,pts[i],pts[i+1]));return m;}
+  function riverCurvePoints(pts,steps=8){
+    if(!pts.length)return [];
+    const out=[],quad=(p0,c,p1,t)=>({x:(1-t)*(1-t)*p0.x+2*(1-t)*t*c.x+t*t*p1.x,y:(1-t)*(1-t)*p0.y+2*(1-t)*t*c.y+t*t*p1.y});
+    let start=pts[0];
+    for(let i=1;i<pts.length-1;i++){const end={x:(pts[i].x+pts[i+1].x)/2,y:(pts[i].y+pts[i+1].y)/2};for(let k=0;k<steps;k++)out.push(quad(start,pts[i],end,k/steps));start=end;}
+    const control=pts[pts.length-2],end=pts[pts.length-1];for(let k=0;k<=steps;k++)out.push(quad(start,control,end,k/steps));
+    return out;
+  }
+  function riverDistance(p,curve){let m=999;for(let i=0;i<curve.length-1;i++)m=Math.min(m,pointSegDistance(p,curve[i],curve[i+1]));return m;}
   function riverCandidate(seed,index){
     const r=rngFrom(String(seed)+':river:'+index),ys=[-6,15,35,55,75,106];let x=8+r()*84,pts=[];
     for(let k=0;k<ys.length;k++){if(k)x=Math.max(3,Math.min(97,x+(r()-.5)*24));pts.push({x:x,y:ys[k]});}
@@ -869,9 +877,10 @@ start('alder-crown-1');requestAnimationFrame(loop);
   function chooseRiver(w){
     let best=null;
     for(let i=0;i<64;i++){
-      const pts=riverCandidate(w.seed||'crownfall',i);let close4=0,close5=0,penalty=0;
-      for(const st of (w.settlements||[])){const d=riverDistance(st,pts);if(d<4)close4++;if(d<5)close5++;if(d<6)penalty+=(6-d)*(6-d);}
-      const score=close4*100+close5*12+penalty;
+      const pts=riverCandidate(w.seed||'crownfall',i),curve=riverCurvePoints(pts);let close4=0,close5=0,penalty=0,edgePenalty=0;
+      for(const st of (w.settlements||[])){const d=riverDistance(st,curve);if(d<4)close4++;if(d<5)close5++;if(d<6)penalty+=(6-d)*(6-d);}
+      for(const p of pts.slice(1,-1)){const edge=Math.min(p.x,100-p.x);if(edge<24)edgePenalty+=(24-edge)*(24-edge);}
+      const score=close4*100+close5*12+penalty+edgePenalty*.2;
       if(!best||score<best.score)best={pts:pts,score:score};
     }
     return best.pts;
@@ -901,12 +910,12 @@ start('alder-crown-1');requestAnimationFrame(loop);
       s+='<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry="'+ry+'" fill="'+colors[i%colors.length]+'" opacity="'+(.09+rng()*.11).toFixed(2)+'" transform="rotate('+(-30+rng()*60).toFixed(0)+' '+x+' '+y+')"/>';
     }
 
-    const riverPts=chooseRiver(w),river=riverPath(riverPts);
-    s+='<path d="'+river+'" fill="none" stroke="#263f42" stroke-opacity=".58" stroke-width="6.3"/><path d="'+river+'" fill="none" stroke="url(#v14river)" stroke-width="4.5"/><path d="'+river+'" fill="none" stroke="#d4ece9" stroke-opacity=".26" stroke-width=".65"/>';
+    const riverPts=chooseRiver(w),riverCurve=riverCurvePoints(riverPts,12),river=riverPath(riverPts);
+    s+='<path d="'+river+'" fill="none" stroke="#263f42" stroke-opacity=".58" stroke-width="6.3"/><path d="'+river+'" fill="none" stroke="url(#v14river)" stroke-width="4.5"/><path d="'+river+'" fill="none" stroke="#e0f3ef" stroke-opacity=".24" stroke-width=".55" stroke-dasharray="1.8 4.4" stroke-linecap="round"/>';
 
     // If the least-conflicting route still brushes a settlement, create a visible dry crossing instead of drawing water underneath the town.
     (w.settlements||[]).forEach(function(st){
-      if(riverDistance(st,riverPts)>=4)return;
+      if(riverDistance(st,riverCurve)>=4)return;
       s+='<ellipse cx="'+st.x.toFixed(1)+'" cy="'+st.y.toFixed(1)+'" rx="3.8" ry="2.8" fill="#60704d" stroke="#a59667" stroke-opacity=".5" stroke-width=".28"/>';
     });
 
@@ -914,11 +923,12 @@ start('alder-crown-1');requestAnimationFrame(loop);
     const bridgeSeen=[];
     (w.roads||[]).forEach(function(edge){
       const A=w.settlements[edge[0]],B=w.settlements[edge[1]];if(!A||!B)return;
-      for(let j=0;j<riverPts.length-1;j++){
-        const hit=segmentIntersection(A,B,riverPts[j],riverPts[j+1]);if(!hit)continue;
-        if(bridgeSeen.some(p=>Math.hypot(p.x-hit.x,p.y-hit.y)<2.2))continue;bridgeSeen.push(hit);
+      for(let j=0;j<riverCurve.length-1;j++){
+        const hit=segmentIntersection(A,B,riverCurve[j],riverCurve[j+1]);if(!hit)continue;
+        if(bridgeSeen.some(p=>Math.hypot(p.x-hit.x,p.y-hit.y)<2.2))break;bridgeSeen.push(hit);
         const ang=Math.atan2(B.y-A.y,B.x-A.x)*180/Math.PI;
         s+='<g transform="translate('+hit.x.toFixed(1)+' '+hit.y.toFixed(1)+') rotate('+ang.toFixed(1)+')"><rect x="-2.0" y="-.72" width="4" height="1.44" rx=".18" fill="#b59a6a" stroke="#59452e" stroke-width=".28"/><path d="M-1.5 -.35 H1.5 M-1.5 .35 H1.5" stroke="#e0c792" stroke-width=".16" opacity=".72"/></g>';
+        break;
       }
     });
 
