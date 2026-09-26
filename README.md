@@ -14,7 +14,7 @@ The standalone HTML build remains available for desktop/offline use.
 
 This branch addresses fresh-player feedback before adding more combat systems.
 
-- **Guided first hour:** first-time players start paused with only their capital visible. The game introduces one Farm upgrade, a Militia recruitment, local neighbors, settlement inspection, and order preparation before revealing the full Marches.
+- **Guided first hour:** first-time players start paused with only their capital visible. The game introduces one Farm upgrade, a Militia recruitment, local neighbors, settlement inspection, and order preparation before revealing the full Marches. Returning v1.4.7 players see this redesigned First Hour once as well, with an immediate Skip First Hour option.
 - **No invisible automation during onboarding:** the Realm Steward starts OFF for the guided introduction and remains OFF until the player chooses to enable it.
 - **Progressive unit disclosure:** Raiders and Cavalry are hidden during the first recruitment lesson, then revealed after the player recruits Militia.
 - **Readable resources:** Food, Wood, Iron, and Influence are named explicitly rather than relying on icons alone. Zero-value cost chips are omitted.
