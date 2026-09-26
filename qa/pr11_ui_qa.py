@@ -139,7 +139,7 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "buildShortcutVisible":page.locator('[data-mobile-jump="buildingsCard"]').is_visible() if is_mobile else True,"effectText":page.locator('.building').filter(has_text="Farms").first.inner_text()}
     snap(page,f"{name}-01-farms.png")
     click_real(page,'[data-build="farms"]')
-    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-first-hour-v148-progress')).onboarding.stage")
     result["stages"]["2_autosave"]=autosave_stage2
 
     # Stage 2: use Recruit on mobile, then verify Militia is actually in the panel viewport.
@@ -151,7 +151,7 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "cavalryVisible":page.locator('[data-recruit="cavalry"]').count()>0 and page.locator('[data-recruit="cavalry"]').first.is_visible()}
     snap(page,f"{name}-02-militia.png")
     click_real(page,'[data-recruit="militia"][data-q="5"]')
-    autosave_stage3=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    autosave_stage3=page.evaluate("JSON.parse(localStorage.getItem('crownfall-first-hour-v148-progress')).onboarding.stage")
     result["stages"]["3_autosave"]=autosave_stage3
 
     # Stage 3 local reveal: at least one labeled Independent must be actually tappable.
@@ -213,11 +213,18 @@ def returning_player_rollout_checks(browser):
     page=ctx.new_page()
     page.goto(BASE,wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
-    # Simulate a v1.4.7 browser: old tutorial seen, but no v1.4.8 First Hour marker.
+    # Simulate a v1.4.7 browser with a real existing autosaved campaign.
     page.evaluate("""() => {
+      const old=JSON.parse(window.__CROWNFALL__.save());
+      delete old.onboarding;
+      old.seed='legacy-return-campaign';
+      old.day=347;
+      old.playerSteward={policy:'balanced',lastAdminDay:345,cursor:0};
+      localStorage.setItem('crownfall-autosave',JSON.stringify(old));
       localStorage.setItem('crownfall-tutorial-seen','1');
       localStorage.removeItem('crownfall-first-hour-complete');
       localStorage.removeItem('crownfall-first-hour-v148-seen');
+      localStorage.removeItem('crownfall-first-hour-v148-progress');
     }""")
     page.reload(wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
@@ -236,7 +243,10 @@ def returning_player_rollout_checks(browser):
       "marker":page.evaluate("localStorage.getItem('crownfall-first-hour-v148-seen')"),
       "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
       "settlements":page.locator("#map .settlement").count(),
-      "roads":page.locator("#roads .road").count()
+      "roads":page.locator("#roads .road").count(),
+      "seed":page.evaluate("window.__CROWNFALL__.getWorld().seed"),
+      "day":page.evaluate("window.__CROWNFALL__.getWorld().day"),
+      "paused":page.locator('.time [data-speed="0"]').evaluate("e=>e.classList.contains('active')")
     }
     page.reload(wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
@@ -244,7 +254,9 @@ def returning_player_rollout_checks(browser):
     no_repeat={
       "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
       "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
-      "settlements":page.locator("#map .settlement").count()
+      "settlements":page.locator("#map .settlement").count(),
+      "seed":page.evaluate("window.__CROWNFALL__.getWorld().seed"),
+      "day":page.evaluate("window.__CROWNFALL__.getWorld().day")
     }
     ctx.close()
     return {"shownOnce":shown_once,"afterSkip":after_skip,"noRepeat":no_repeat}
@@ -256,10 +268,10 @@ def persistence_checks(browser):
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(300)
 
-    # Reach Stage 2. Tutorial progress should be in autosave and resume automatically after refresh.
+    # Reach Stage 2. Tutorial progress uses its dedicated key and resumes automatically after refresh.
     click_real(page,"#introNext")
     click_real(page,'[data-build="farms"]')
-    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-first-hour-v148-progress')).onboarding.stage")
     page.reload(wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(260)
@@ -293,7 +305,7 @@ def persistence_checks(browser):
     page.evaluate("""() => {
       const w=JSON.parse(window.__CROWNFALL__.save());
       w.onboarding={active:true,stage:4};
-      localStorage.setItem('crownfall-autosave',JSON.stringify(w));
+      localStorage.setItem('crownfall-first-hour-v148-progress',JSON.stringify(w));
       localStorage.removeItem('crownfall-first-hour-v148-seen');
       localStorage.removeItem('crownfall-first-hour-complete');
       localStorage.removeItem('crownfall-tutorial-seen');
@@ -409,12 +421,16 @@ with sync_playwright() as p:
     if rollout["afterSkip"]["marker"]!="1" or rollout["afterSkip"]["active"]:
         hard.append("rollout: skipping First Hour did not persist v1.4.8 completion")
     if rollout["afterSkip"]["settlements"]!=48:
-        hard.append("rollout: skipping First Hour did not immediately reveal all 48 settlements")
+        hard.append("rollout: skipping First Hour did not restore a full campaign map")
     if rollout["afterSkip"]["roads"]<1:
-        hard.append("rollout: skipping First Hour did not restore the full road map")
+        hard.append("rollout: skipping First Hour did not restore campaign roads")
+    if rollout["afterSkip"]["seed"]!="legacy-return-campaign" or rollout["afterSkip"]["day"]!=347 or not rollout["afterSkip"]["paused"]:
+        hard.append("rollout: existing v1.4.7 autosave was not preserved/restored after skip")
     if rollout["noRepeat"]["active"] or not rollout["noRepeat"]["tutorialHidden"]:
         hard.append("rollout: v1.4.8 First Hour repeated after being skipped once")
     if rollout["noRepeat"]["settlements"]!=48:
         hard.append("rollout: reload after skip did not preserve full-map reveal")
+    if rollout["noRepeat"]["seed"]!="legacy-return-campaign" or rollout["noRepeat"]["day"]!=347:
+        hard.append("rollout: page reopen did not resume the preserved campaign")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
