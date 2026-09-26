@@ -1,8 +1,17 @@
-import json, os, time, math, pathlib
+import json, os, time, math, pathlib, re
 from playwright.sync_api import sync_playwright
 
 BASE="http://127.0.0.1:8000/index.html"
 OUT=pathlib.Path("qa-output"); OUT.mkdir(exist_ok=True)
+
+# Catch the recurring $() vs $() selector-list regression before launching browsers.
+source=pathlib.Path("index.html").read_text(encoding="utf-8")
+bad_selector_lists=[]
+for n,line in enumerate(source.splitlines(),1):
+    if re.search(r'(?<!\$)\$\([^)]*\)\.forEach',line):
+        bad_selector_lists.append((n,line.strip()))
+if bad_selector_lists:
+    raise SystemExit("Single-element selector used with .forEach(): "+repr(bad_selector_lists))
 
 def box(page,sel):
     loc=page.locator(sel)
