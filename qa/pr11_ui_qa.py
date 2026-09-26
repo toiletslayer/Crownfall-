@@ -115,7 +115,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "musicExists":music_exists,
       "musicHidden":music.first.evaluate("e=>e.classList.contains('hidden')") if music_exists else False,
       "timeControlsDisabled":page.locator(".time button").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)"),
-      "otherTabsDisabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)")}
+      "otherTabsDisabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)"),
+      "loadNewDisabled":page.locator("#load,#newGame").evaluate_all("els=>els.length===2&&els.every(e=>e.disabled)")}
     snap(page,f"{name}-00-day0.png")
     click_real(page,"#introNext")
 
@@ -180,6 +181,7 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "dayAdvanced":day_advanced,
       "timeControlsEnabled":page.locator(".time button").evaluate_all("els=>els.length>0&&els.every(e=>!e.disabled)"),
       "otherTabsEnabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>!e.disabled)"),
+      "loadNewEnabled":page.locator("#load,#newGame").evaluate_all("els=>els.length===2&&els.every(e=>!e.disabled)"),
       "autosaveCompleted":page.evaluate("(()=>{const w=JSON.parse(localStorage.getItem('crownfall-autosave'));return !!w.onboarding&&!w.onboarding.active&&w.onboarding.stage===6;})()"),
       "map":map_counts(page)}
     snap(page,f"{name}-06-running.png")
@@ -211,7 +213,9 @@ def returning_player_rollout_checks(browser):
     shown_once={
       "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
       "stage":stage(page),
-      "skipText":page.locator("#introSkip").inner_text() if page.locator("#introSkip").count() else ""
+      "skipText":page.locator("#introSkip").inner_text() if page.locator("#introSkip").count() else "",
+      "loadDisabled":page.locator("#load").is_disabled(),
+      "newGameDisabled":page.locator("#newGame").is_disabled()
     }
     # Skipping counts as having seen v1.4.8 First Hour.
     page.locator("#introSkip").click()
@@ -338,6 +342,7 @@ with sync_playwright() as p:
         elif not r["stages"]["0"].get("musicHidden"): hard.append(r["profile"]+": music button exposed during tutorial")
         if not r["stages"]["0"].get("timeControlsDisabled"): hard.append(r["profile"]+": time controls are usable during paused onboarding")
         if not r["stages"]["0"].get("otherTabsDisabled"): hard.append(r["profile"]+": advanced tabs are usable during onboarding")
+        if not r["stages"]["0"].get("loadNewDisabled"): hard.append(r["profile"]+": Load/New Game can bypass one-time First Hour")
         if r["stages"]["0"].get("map",{}).get("terrainFields",0)>1: hard.append(r["profile"]+": hidden settlement fields leak into Day 0")
         if r["stages"]["0"].get("map",{}).get("legacySettlementDecor",0)>1: hard.append(r["profile"]+": hidden settlement terrain markers leak into Day 0")
         if r["stages"].get("2_autosave")!=2: hard.append(r["profile"]+": onboarding stage 2 was not autosaved")
@@ -359,6 +364,7 @@ with sync_playwright() as p:
         if not r["finished"].get("dayAdvanced"): hard.append(r["profile"]+": Start the clock did not advance to Day 1")
         if not r["finished"].get("timeControlsEnabled"): hard.append(r["profile"]+": time controls stayed locked after onboarding")
         if not r["finished"].get("otherTabsEnabled"): hard.append(r["profile"]+": advanced tabs stayed locked after onboarding")
+        if not r["finished"].get("loadNewEnabled"): hard.append(r["profile"]+": Load/New Game stayed locked after onboarding")
         if not r["finished"].get("autosaveCompleted"): hard.append(r["profile"]+": completed onboarding was not autosaved")
     if persistence["savedStage"]!=2: hard.append("persistence: manual tutorial save did not preserve stage 2")
     if persistence["restored"]["stage"]!=2 or "GARRISON" not in persistence["restored"]["tutorial"] or not persistence["restored"]["timeLocked"]:
@@ -376,6 +382,8 @@ with sync_playwright() as p:
         hard.append("rollout: v1.4.7 returning player did not receive v1.4.8 First Hour")
     if "Skip" not in rollout["shownOnce"]["skipText"]:
         hard.append("rollout: returning player was not offered a skip option")
+    if not rollout["shownOnce"]["loadDisabled"] or not rollout["shownOnce"]["newGameDisabled"]:
+        hard.append("rollout: returning player can bypass First Hour via Load/New Game")
     if rollout["afterSkip"]["marker"]!="1" or rollout["afterSkip"]["active"]:
         hard.append("rollout: skipping First Hour did not persist v1.4.8 completion")
     if rollout["noRepeat"]["active"] or not rollout["noRepeat"]["tutorialHidden"]:
