@@ -53,7 +53,9 @@ def map_counts(page):
       roads: document.querySelectorAll('#roads .road').length,
       bridges: document.querySelectorAll('#v14Terrain rect[fill="#b59a6a"]').length,
       dryCrossings: document.querySelectorAll('#v14Terrain ellipse[fill="#60704d"]').length,
-      river: document.querySelectorAll('#v14Terrain path[stroke="#263f42"]').length
+      river: document.querySelectorAll('#v14Terrain path[stroke="#263f42"]').length,
+      terrainFields: document.querySelectorAll('#v14Terrain rect[fill="#b19d63"]').length,
+      legacySettlementDecor: document.querySelectorAll('#map .terrainLayer .terrain').length
     })""")
 
 def visible_text(page):
@@ -106,7 +108,9 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     result["stages"]["0"]={"map":map_counts(page),"tutorial":page.locator("#tutorial").inner_text(),
       "tutorialBox":box(page,"#tutorial"),"panelBox":box(page,"#panel"),
       "legendHidden":page.locator("#legend").evaluate("e=>e.classList.contains('hidden')"),
-      "musicHidden":page.locator("#v13Music").evaluate("e=>e.classList.contains('hidden')")}
+      "musicHidden":page.locator("#v13Music").evaluate("e=>e.classList.contains('hidden')"),
+      "timeControlsDisabled":page.locator(".time button").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)"),
+      "otherTabsDisabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)")}
     snap(page,f"{name}-00-day0.png")
     click_real(page,"#introNext")
 
@@ -117,6 +121,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "buildShortcutVisible":page.locator('[data-mobile-jump="buildingsCard"]').is_visible() if is_mobile else True,"effectText":page.locator('.building').filter(has_text="Farms").first.inner_text()}
     snap(page,f"{name}-01-farms.png")
     click_real(page,'[data-build="farms"]')
+    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    result["stages"]["2_autosave"]=autosave_stage2
 
     # Stage 2: use Recruit on mobile, then verify Militia is actually in the panel viewport.
     if is_mobile: click_real(page,'[data-mobile-jump="garrisonCard"]')
@@ -127,6 +133,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "cavalryVisible":page.locator('[data-recruit="cavalry"]').count()>0 and page.locator('[data-recruit="cavalry"]').first.is_visible()}
     snap(page,f"{name}-02-militia.png")
     click_real(page,'[data-recruit="militia"][data-q="5"]')
+    autosave_stage3=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    result["stages"]["3_autosave"]=autosave_stage3
 
     # Stage 3 local reveal: at least one labeled Independent must be actually tappable.
     page.wait_for_timeout(450)
@@ -164,7 +172,11 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
         day_advanced=False
     result["finished"]={"world":world(page),"tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
       "normalSpeedActive":page.locator('.time [data-speed="0.25"]').evaluate("e=>e.classList.contains('active')"),
-      "dayAdvanced":day_advanced,"map":map_counts(page)}
+      "dayAdvanced":day_advanced,
+      "timeControlsEnabled":page.locator(".time button").evaluate_all("els=>els.length>0&&els.every(e=>!e.disabled)"),
+      "otherTabsEnabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>!e.disabled)"),
+      "autosaveCompleted":page.evaluate("(()=>{const w=JSON.parse(localStorage.getItem('crownfall-autosave'));return !!w.onboarding&&!w.onboarding.active&&w.onboarding.stage===6;})()"),
+      "map":map_counts(page)}
     snap(page,f"{name}-06-running.png")
     if name.startswith("desktop"):
         samples=[]
@@ -177,18 +189,71 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     ctx.close()
     return result
 
+def persistence_checks(browser):
+    ctx=browser.new_context(viewport={"width":1200,"height":820})
+    page=ctx.new_page()
+    page.goto(BASE,wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(300)
+    # Reach stage 2 and save manually.
+    click_real(page,"#introNext")
+    click_real(page,'[data-build="farms"]')
+    page.locator("#save").click(); page.wait_for_timeout(120)
+    saved_stage=page.evaluate("JSON.parse(localStorage.getItem('crownfall-save')).onboarding.stage")
+    # Advance to stage 3, then load the stage-2 manual save.
+    click_real(page,'[data-recruit="militia"][data-q="5"]')
+    page.locator("#load").click(); page.wait_for_timeout(250)
+    restored={
+      "stage":stage(page),
+      "tutorial":page.locator("#tutorial").inner_text(),
+      "timeLocked":page.locator(".time button").evaluate_all("els=>els.every(e=>e.disabled)")
+    }
+    # A legacy v1 save without onboarding must still load and hide tutorial chrome.
+    page.evaluate("""() => {
+      const w=JSON.parse(window.__CROWNFALL__.save());
+      delete w.onboarding;
+      w.playerSteward.policy='balanced';
+      localStorage.setItem('crownfall-save',JSON.stringify(w));
+      localStorage.removeItem('crownfall-first-hour-complete');
+      localStorage.removeItem('crownfall-tutorial-seen');
+    }""")
+    page.locator("#load").click(); page.wait_for_timeout(250)
+    legacy={
+      "hasOnboarding":page.evaluate("'onboarding' in window.__CROWNFALL__.getWorld()"),
+      "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
+      "timeUnlocked":page.locator(".time button").evaluate_all("els=>els.every(e=>!e.disabled)")
+    }
+    # A stale active tutorial save must be normalized if completion was already recorded.
+    page.evaluate("""() => {
+      const w=JSON.parse(window.__CROWNFALL__.save());
+      w.onboarding={active:true,stage:2};
+      localStorage.setItem('crownfall-save',JSON.stringify(w));
+      localStorage.setItem('crownfall-first-hour-complete','1');
+      localStorage.setItem('crownfall-tutorial-seen','1');
+    }""")
+    page.locator("#load").click(); page.wait_for_timeout(250)
+    normalized={
+      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
+      "stage":page.evaluate("window.__CROWNFALL__.getWorld().onboarding?.stage"),
+      "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')")
+    }
+    ctx.close()
+    return {"savedStage":saved_stage,"restored":restored,"legacy":legacy,"normalized":normalized}
+
 with sync_playwright() as p:
     allr=[]
     desktop=p.chromium.launch(headless=True)
     allr.append(profile(desktop,"desktop-chromium",{"width":1440,"height":900}))
+    persistence=persistence_checks(desktop)
     desktop.close()
 
     mobile=p.webkit.launch(headless=True)
     allr.append(profile(mobile,"iphone-webkit",{"width":390,"height":844},True,True))
     mobile.close()
 
-    with open(OUT/"results.json","w") as fh: json.dump(allr,fh,indent=2)
-    print(json.dumps(allr,indent=2))
+    payload={"profiles":allr,"persistence":persistence}
+    with open(OUT/"results.json","w") as fh: json.dump(payload,fh,indent=2)
+    print(json.dumps(payload,indent=2))
     hard=[]
     for r in allr:
         if r.get("errors"): hard.append(r["profile"]+": browser errors: "+" | ".join(r["errors"]))
@@ -200,6 +265,12 @@ with sync_playwright() as p:
             hard.append(r["profile"]+": full map did not reveal 48 settlements")
         if not r["stages"]["0"].get("legendHidden"): hard.append(r["profile"]+": legend exposed during staged reveal")
         if not r["stages"]["0"].get("musicHidden"): hard.append(r["profile"]+": music button exposed during tutorial")
+        if not r["stages"]["0"].get("timeControlsDisabled"): hard.append(r["profile"]+": time controls are usable during paused onboarding")
+        if not r["stages"]["0"].get("otherTabsDisabled"): hard.append(r["profile"]+": advanced tabs are usable during onboarding")
+        if r["stages"]["0"].get("map",{}).get("terrainFields",0)>1: hard.append(r["profile"]+": hidden settlement fields leak into Day 0")
+        if r["stages"]["0"].get("map",{}).get("legacySettlementDecor",0)>1: hard.append(r["profile"]+": hidden settlement terrain markers leak into Day 0")
+        if r["stages"].get("2_autosave")!=2: hard.append(r["profile"]+": onboarding stage 2 was not autosaved")
+        if r["stages"].get("3_autosave")!=3: hard.append(r["profile"]+": onboarding stage 3 was not autosaved")
         if not r["stages"]["1"].get("buildShortcutVisible"): hard.append(r["profile"]+": Build shortcut unavailable during Farms lesson")
         if not r["stages"]["2"].get("recruitShortcutVisible"): hard.append(r["profile"]+": Recruit shortcut unavailable during Militia lesson")
         if not r["stages"]["4"].get("actionsShortcutVisible"): hard.append(r["profile"]+": Actions shortcut unavailable during order lesson")
@@ -215,5 +286,15 @@ with sync_playwright() as p:
         if geo.get("bridgeCount")!=geo.get("visualCrossings"): hard.append(r["profile"]+": bridge count does not match visual river crossings")
         if not r["finished"].get("normalSpeedActive"): hard.append(r["profile"]+": Start the clock did not select normal speed")
         if not r["finished"].get("dayAdvanced"): hard.append(r["profile"]+": Start the clock did not advance to Day 1")
+        if not r["finished"].get("timeControlsEnabled"): hard.append(r["profile"]+": time controls stayed locked after onboarding")
+        if not r["finished"].get("otherTabsEnabled"): hard.append(r["profile"]+": advanced tabs stayed locked after onboarding")
+        if not r["finished"].get("autosaveCompleted"): hard.append(r["profile"]+": completed onboarding was not autosaved")
+    if persistence["savedStage"]!=2: hard.append("persistence: manual tutorial save did not preserve stage 2")
+    if persistence["restored"]["stage"]!=2 or "GARRISON" not in persistence["restored"]["tutorial"] or not persistence["restored"]["timeLocked"]:
+        hard.append("persistence: loading a mid-tutorial save did not restore the correct paused lesson")
+    if persistence["legacy"]["hasOnboarding"] or not persistence["legacy"]["tutorialHidden"] or not persistence["legacy"]["timeUnlocked"]:
+        hard.append("persistence: legacy v1 save compatibility failed")
+    if persistence["normalized"]["active"] or persistence["normalized"]["stage"]!=6 or not persistence["normalized"]["tutorialHidden"]:
+        hard.append("persistence: completed user can be trapped by stale active onboarding save")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
