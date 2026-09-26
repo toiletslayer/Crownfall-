@@ -234,6 +234,68 @@ def desktop_journey(browser):
     ctx.close()
     return result
 
+def storage_fallback_journey(browser):
+    ctx=browser.new_context(viewport={"width":1000,"height":760})
+    ctx.add_init_script("""() => {
+      for (const name of ['getItem','setItem','removeItem']) {
+        Object.defineProperty(Storage.prototype,name,{configurable:true,value:function(){throw new DOMException('blocked','SecurityError');}});
+      }
+    }""")
+    page=ctx.new_page();errors=[];page.on("pageerror",lambda e:errors.append(str(e)))
+    page.goto(BASE,wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(350)
+    skip_intro(page);page.wait_for_timeout(120)
+    if page.locator('.time [data-speed="0"]').count(): page.locator('.time [data-speed="0"]').click()
+    save_text=page.locator("#save").inner_text()
+    click(page,"#save")
+    seed=page.evaluate("window.__CROWNFALL__.getWorld().seed")
+    before=page.evaluate("window.__CROWNFALL__.getWorld().settlements.find(s=>s.owner===0).buildings.farms")
+    page.locator('[data-build="farms"]').click();page.wait_for_timeout(70)
+    changed=page.evaluate("window.__CROWNFALL__.getWorld().settlements.find(s=>s.owner===0).buildings.farms")
+    click(page,"#load");page.wait_for_timeout(100)
+    restored=page.evaluate("window.__CROWNFALL__.getWorld().settlements.find(s=>s.owner===0).buildings.farms")
+    page.once("dialog",lambda d:d.accept())
+    page.locator("#newGame").click();page.wait_for_timeout(120)
+    new_seed=page.evaluate("window.__CROWNFALL__.getWorld().seed")
+    out={"errors":errors,"saveText":save_text,"savedSeed":seed,"buildChanged":changed==before+1,
+         "sessionLoadRestored":restored==before,"newWorldWorked":new_seed!=seed}
+    ctx.close()
+    return out
+
+def victory_modal_journey(browser):
+    ctx=browser.new_context(viewport={"width":1200,"height":820})
+    page=ctx.new_page();errors=[];page.on("pageerror",lambda e:errors.append(str(e)))
+    page.goto(BASE,wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(300);skip_intro(page);page.wait_for_timeout(120)
+    page.locator('.time [data-speed="0"]').click()
+    page.evaluate("""() => {
+      const w=window.__CROWNFALL__.getWorld();
+      for(const s of w.settlements)s.owner=null;
+      for(let i=0;i<22;i++)w.settlements[i].owner=0;
+      for(let i=22;i<32;i++)w.settlements[i].owner=1;
+      w.day=100;w.victory=false;w.defeat=false;w.sandbox=false;w.victoryType=null;
+      window.__CROWNFALL__.refresh();
+    }""")
+    page.locator('.time [data-speed="4"]').click()
+    try:
+        page.wait_for_function("window.__CROWNFALL__.getWorld().sandbox===true",timeout=2500)
+    except:
+        pass
+    page.wait_for_timeout(120)
+    modal_visible=not page.locator("#modal").evaluate("e=>e.classList.contains('hidden')")
+    modal_text=page.locator("#modalContent").inner_text() if modal_visible else ""
+    day1=page.evaluate("window.__CROWNFALL__.getWorld().day")
+    page.wait_for_timeout(350)
+    day2=page.evaluate("window.__CROWNFALL__.getWorld().day")
+    out={"errors":errors,"victory":page.evaluate("window.__CROWNFALL__.getWorld().victory"),
+         "type":page.evaluate("window.__CROWNFALL__.getWorld().victoryType"),
+         "sandbox":page.evaluate("window.__CROWNFALL__.getWorld().sandbox"),
+         "modalVisible":modal_visible,"modalText":modal_text,"sandboxContinues":day2>day1}
+    ctx.close()
+    return out
+
 def mobile_journey(browser):
     ctx=browser.new_context(viewport={"width":390,"height":844},is_mobile=True,has_touch=True)
     page=ctx.new_page();errors=[];page.on("pageerror",lambda e:errors.append(str(e)))
@@ -288,12 +350,14 @@ def mobile_journey(browser):
 with sync_playwright() as p:
     chromium=p.chromium.launch(headless=True)
     desktop=desktop_journey(chromium)
+    storage_fallback=storage_fallback_journey(chromium)
+    victory_modal=victory_modal_journey(chromium)
     chromium.close()
     webkit=p.webkit.launch(headless=True)
     mobile=mobile_journey(webkit)
     webkit.close()
 
-payload={"desktop":desktop,"mobile":mobile}
+payload={"desktop":desktop,"storageFallback":storage_fallback,"victoryModal":victory_modal,"mobile":mobile}
 print(json.dumps(payload,indent=2))
 (OUT/"results.json").write_text(json.dumps(payload,indent=2))
 
@@ -316,6 +380,16 @@ if d["annex"]["owner"]!=0 or d["annex"]["influenceSpent"]!=35 or d["annex"]["rep
 if not d["war"]["enabledAfterTruce"] or d["war"]["status"]!="war": fails.append("desktop: post-truce war flow failed")
 if not d["threatPause"]["warning"] or not d["threatPause"]["pauseActive"] or d["threatPause"]["incomingArmies"]<1: fails.append("desktop: Threat Pause failed")
 if not d["newWorld"]["seedChanged"] or d["newWorld"]["tutorialActive"] or d["newWorld"]["steward"]!="balanced" or not d["newWorld"]["manualSaveRestored"]: fails.append("desktop: New World/manual-save behavior failed")
+
+sf=storage_fallback
+if sf["errors"]: fails.append("storage fallback browser errors: "+" | ".join(sf["errors"]))
+if "session" not in sf["saveText"].lower() or not sf["buildChanged"] or not sf["sessionLoadRestored"] or not sf["newWorldWorked"]:
+    fails.append("storage fallback: session Save/Load/New World behavior failed")
+
+vm=victory_modal
+if vm["errors"]: fails.append("victory browser errors: "+" | ".join(vm["errors"]))
+if not vm["victory"] or vm["type"]!="hegemony" or not vm["sandbox"] or not vm["modalVisible"] or "hegemony" not in vm["modalText"].lower() or not vm["sandboxContinues"]:
+    fails.append("victory: hegemony modal or sandbox continuation failed")
 
 m=mobile
 if m["errors"]: fails.append("mobile browser errors: "+" | ".join(m["errors"]))
