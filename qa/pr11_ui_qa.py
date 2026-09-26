@@ -208,6 +208,34 @@ def persistence_checks(browser):
       "tutorial":page.locator("#tutorial").inner_text(),
       "timeLocked":page.locator(".time button").evaluate_all("els=>els.every(e=>e.disabled)")
     }
+    # Stage 4 depends on the inspected Independent target; that target must survive save/load.
+    click_real(page,'[data-recruit="militia"][data-q="5"]')
+    page.wait_for_timeout(180)
+    neutral=page.locator("#map .settlement.neutral").first
+    neutral.click(); page.wait_for_timeout(180)
+    target_name=page.evaluate("""() => {
+      const w=window.__CROWNFALL__.getWorld();
+      return w.settlements[w.onboarding.targetId]?.name || '';
+    }""")
+    page.locator("#save").click(); page.wait_for_timeout(100)
+    page.locator("#map .settlement.playerRealm").first.click(); page.wait_for_timeout(100)
+    page.locator("#load").click(); page.wait_for_timeout(220)
+    target_restore={
+      "stage":stage(page),
+      "targetName":target_name,
+      "panelHasTarget":target_name in page.locator("#panel").inner_text(),
+      "raidVisible":page.locator('[data-prepare="raid"]').count()>0 and page.locator('[data-prepare="raid"]').first.is_visible()
+    }
+    # A stale stage-4 save without a target must safely return to the Neighbors lesson.
+    page.evaluate("""() => {
+      const w=JSON.parse(window.__CROWNFALL__.save());
+      w.onboarding={active:true,stage:4};
+      localStorage.setItem('crownfall-save',JSON.stringify(w));
+      localStorage.removeItem('crownfall-first-hour-complete');
+      localStorage.removeItem('crownfall-tutorial-seen');
+    }""")
+    page.locator("#load").click(); page.wait_for_timeout(220)
+    stale_stage4={"stage":stage(page),"tutorial":page.locator("#tutorial").inner_text()}
     # A legacy v1 save without onboarding must still load and hide tutorial chrome.
     page.evaluate("""() => {
       const w=JSON.parse(window.__CROWNFALL__.save());
@@ -238,7 +266,7 @@ def persistence_checks(browser):
       "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')")
     }
     ctx.close()
-    return {"savedStage":saved_stage,"restored":restored,"legacy":legacy,"normalized":normalized}
+    return {"savedStage":saved_stage,"restored":restored,"targetRestore":target_restore,"staleStage4":stale_stage4,"legacy":legacy,"normalized":normalized}
 
 with sync_playwright() as p:
     allr=[]
@@ -292,6 +320,11 @@ with sync_playwright() as p:
     if persistence["savedStage"]!=2: hard.append("persistence: manual tutorial save did not preserve stage 2")
     if persistence["restored"]["stage"]!=2 or "GARRISON" not in persistence["restored"]["tutorial"] or not persistence["restored"]["timeLocked"]:
         hard.append("persistence: loading a mid-tutorial save did not restore the correct paused lesson")
+    tr=persistence["targetRestore"]
+    if tr["stage"]!=4 or not tr["panelHasTarget"] or not tr["raidVisible"]:
+        hard.append("persistence: stage-4 inspected target was not restored after load")
+    if persistence["staleStage4"]["stage"]!=3 or "NEIGHBORS" not in persistence["staleStage4"]["tutorial"]:
+        hard.append("persistence: stale stage-4 save without target did not recover to Neighbors lesson")
     if persistence["legacy"]["hasOnboarding"] or not persistence["legacy"]["tutorialHidden"] or not persistence["legacy"]["timeUnlocked"]:
         hard.append("persistence: legacy v1 save compatibility failed")
     if persistence["normalized"]["active"] or persistence["normalized"]["stage"]!=6 or not persistence["normalized"]["tutorialHidden"]:
