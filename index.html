@@ -622,7 +622,9 @@ function renderMap(){
 
 let lastMapStructureSig='';
 function mapStructureSig(){
-  return String(world.seed)+'|'+world.settlements.length+'|'+world.roads.length;
+  const stage=onboardingStage();
+  const reveal=onboardingActive()?(stage<3?'capital':stage<5?'local':'full'):'full';
+  return String(world.seed)+'|'+world.settlements.length+'|'+world.roads.length+'|'+reveal;
 }
 function syncMapNotice(threats){
   const notice=$('#mapNotice'); if(!notice)return;
