@@ -41,7 +41,10 @@ function invariant(w,label){
   check(seen.size===w.settlements.length,`${label}: road graph disconnected (${seen.size}/${w.settlements.length})`);
   for(const s of w.settlements){
     check(s.owner===null||(Number.isInteger(s.owner)&&s.owner>=0&&s.owner<w.factions.length),`${label}: invalid owner at ${s.id}`);
-    for(const k of api.RESOURCE_KEYS)check(Number.isFinite(s.resources[k])&&s.resources[k]>=0,`${label}: invalid ${k} at ${s.id}`);
+    for(const k of api.RESOURCE_KEYS){
+      check(Number.isFinite(s.resources[k])&&s.resources[k]>=0,`${label}: invalid ${k} at ${s.id}`);
+      check(s.resources[k]<=api.storageCap(s)+1e-9,`${label}: ${k} exceeds storage cap at ${s.id}`);
+    }
     for(const [k,d] of Object.entries(api.BUILDINGS))check(Number.isInteger(s.buildings[k])&&s.buildings[k]>=0&&s.buildings[k]<=d.max,`${label}: invalid ${k} level at ${s.id}`);
     for(const [k,n] of Object.entries(s.troops))check(api.UNITS[k]&&Number.isInteger(n)&&n>=0,`${label}: invalid troop ${k} at ${s.id}`);
   }
@@ -142,6 +145,22 @@ metrics.missionRuleChecks=11;
   w.day=100;check(api.playerDiplomacyAction(w,1,'war').ok&&api.getDiplomacy(w,0,1)==='war','diplomacy: war failed after truce');
 }
 metrics.diplomacyChecks=4;
+
+// Raid loot is delivered only into available storage and follows the army home if its origin was lost.
+{
+  const w=api.createWorld('raid-storage'),home=w.settlements.find(s=>s.owner===0),target=api.neighborsOf(w,home.id).find(s=>s.owner===null);
+  home.troops={militia:220,spears:120,raiders:80,cavalry:30};
+  const cap=api.storageCap(home);home.resources={food:cap-1,wood:cap-1,iron:cap-1};
+  target.troops={militia:0,spears:0,raiders:0,cavalry:0};target.resources={food:1000,wood:1000,iron:1000};
+  const sent=api.sendArmy(w,0,home.id,target.id,{militia:120,spears:60,raiders:40,cavalry:15},'raid');
+  check(sent.ok,'raid-storage: dispatch failed');
+  if(sent.ok){
+    w.armies=w.armies.filter(a=>a.id!==sent.army.id);api.resolveArmy(w,sent.army,()=>0.5);
+    for(const k of api.RESOURCE_KEYS)check(home.resources[k]===cap,`raid-storage: ${k} exceeded cap or did not fill available room`);
+    const rp=w.battleReports.at(-1);for(const k of api.RESOURCE_KEYS)check(rp.loot[k]===1,`raid-storage: reported ${k} loot ignored storage room`);
+  }
+}
+metrics.raidStorageChecks=6;
 
 // Guaranteed annex accounting and battle-report reconciliation.
 {
