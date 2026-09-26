@@ -20,7 +20,7 @@ First-time flow is now staged:
 7. Ask the player to prepare a Raid / Attack / Annex order.
 8. Reveal the full Marches and let the player start the clock.
 
-The tutorial can be skipped immediately. Returning v1.4.7 players who only have the older tutorial marker are shown the v1.4.8 First Hour once. Completing or skipping it writes a v1.4.8-specific marker so it is not forced again.
+The tutorial can be skipped immediately. Returning v1.4.7 players who only have the older tutorial marker are shown the v1.4.8 First Hour once. Completing or skipping it writes a v1.4.8-specific marker so it is not forced again. If that returning player already has a campaign autosave/manual save, the tutorial uses a separate progress slot; their existing campaign is restored paused after the First Hour instead of being overwritten.
 
 ### “The game may be spending things before I understand them.”
 
@@ -119,14 +119,16 @@ Because the UX complaint can be addressed visually without disturbing travel bal
 - iPhone-sized WebKit (390×844, touch enabled) guided flow: PASS.
 - Day 0 exposes one settlement, zero roads/bridges, one settlement-linked field/decor marker, and keeps the faction legend/music control hidden.
 - Time controls and Realm/Diplomacy/Chronicle tabs stay disabled throughout onboarding and re-enable afterward.
-- Stage 2 and Stage 3 tutorial progress is written to autosave immediately.
-- Refreshing or reopening during an unfinished First Hour resumes the autosaved tutorial stage and keeps time paused; Load remains locked until the First Hour is completed or skipped.
+- Stage 2 and Stage 3 tutorial progress is written immediately to the dedicated `crownfall-first-hour-v148-progress` slot, not the normal campaign autosave.
+- Refreshing or reopening during an unfinished First Hour resumes that tutorial-progress slot and keeps time paused; Load remains locked until the First Hour is completed or skipped.
+- A returning v1.4.7 campaign autosave/manual save is preserved while the one-time First Hour runs, then restored paused after completion or Skip.
+- Normal page reopen resumes the campaign autosave paused instead of silently replacing it with a new world.
 - Stage 4 persists the inspected Independent target; loading restores its target panel and contextual Raid button.
 - A stale Stage 4 save without a target safely falls back to the Neighbors lesson.
 - Legacy version-1 saves without an `onboarding` field still load with tutorial chrome hidden.
 - A completed user cannot be trapped by an older active-onboarding save; it normalizes to completed Stage 6.
 - “Start the clock” selects normal speed and reaches Day 1 in both browser profiles.
-- Load/New Game are locked while the one-time First Hour is active, preventing an old save from bypassing the rollout; skipping or completing the First Hour unlocks them immediately.
+- Load/New Game are locked while the one-time First Hour is active. The old campaign is preserved behind the tutorial and restored automatically for returning players; skipping or completing the First Hour unlocks normal save controls immediately.
 - Bridge count matches actual curved-river road crossings in the browser sample, with zero uncovered close settlements.
 - No Siege Crew or siege mechanic is included.
 - No road-topology change is included.
@@ -138,6 +140,8 @@ Because the UX complaint can be addressed visually without disturbing travel bal
 The focused merge-risk pass found and fixed issues that the initial visual QA did not cover:
 
 - onboarding progress previously could be lost before the normal Day-15 autosave;
+- an initial rollout implementation could overwrite a returning player's normal campaign autosave while showing the new First Hour; tutorial progress now has its own storage key and the prior campaign is restored afterward;
+- ordinary page startup previously created a fresh world before preserving the existing autosave; startup now resumes the campaign autosave paused;
 - loading an onboarding save did not rebuild the matching tutorial state;
 - a stale completed-user autosave could reopen an active tutorial world;
 - Stage 4 depended on non-persisted UI selection state;
@@ -146,6 +150,28 @@ The focused merge-risk pass found and fixed issues that the initial visual QA di
 - the QA workflow originally only ran on the feature branch and would have gone dormant after merge;
 - the page title still said `v1.4.8-dev`;
 - several selector-list regressions were caught and fixed before merge.
+
+## Whole-game regression added during final QA
+
+The PR now keeps a permanent core and browser regression pass in addition to the focused First Hour checks.
+
+Latest green run on the final gameplay code covered:
+
+- 250 generated worlds and graph/start-fairness checks;
+- 2,500 production/storage assertions;
+- 500 recruitment/unlock/supply checks;
+- army mission, truce, alliance and stale-reinforcement edge cases;
+- diplomacy and exact annex accounting;
+- raid-loot storage-cap behavior;
+- 100 deterministic chunking comparisons;
+- 180 save/migration round-trips;
+- immediate victory/defeat state recognition;
+- 80 long human-like QA campaigns with 35,017 battle reports reconciled;
+- desktop Chromium build/recruit/save/load, Steward, diplomacy, allied reinforcement, raid/report, annex, war, Threat Pause, New World, and victory/sandbox paths;
+- blocked-localStorage session Save/Load/New World behavior;
+- iPhone-sized WebKit workspace, help, footer/music, save/load and clock behavior.
+
+During this pass the following whole-game issues were fixed: hostile orders against allies, reinforcements becoming accidental attacks after diplomacy changed in transit, raid loot exceeding storage, delayed victory/defeat recognition, incorrect hegemony victory copy, First Hour skip not rebuilding the full map, and campaign autosave loss/replacement on reopen or tutorial rollout.
 
 ## Known residuals / intentional behavior
 
