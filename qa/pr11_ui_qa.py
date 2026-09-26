@@ -105,10 +105,13 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     result={"profile":name,"viewport":viewport,"initial":world(page),"stages":{},"errors":errors}
 
     # Stage 0
+    music=page.locator("#v13Music")
+    music_exists=music.count()>0
     result["stages"]["0"]={"map":map_counts(page),"tutorial":page.locator("#tutorial").inner_text(),
       "tutorialBox":box(page,"#tutorial"),"panelBox":box(page,"#panel"),
       "legendHidden":page.locator("#legend").evaluate("e=>e.classList.contains('hidden')"),
-      "musicHidden":page.locator("#v13Music").evaluate("e=>e.classList.contains('hidden')"),
+      "musicExists":music_exists,
+      "musicHidden":music.first.evaluate("e=>e.classList.contains('hidden')") if music_exists else False,
       "timeControlsDisabled":page.locator(".time button").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)"),
       "otherTabsDisabled":page.locator("nav .tab:not([data-tab='settlement'])").evaluate_all("els=>els.length>0&&els.every(e=>e.disabled)")}
     snap(page,f"{name}-00-day0.png")
@@ -292,7 +295,8 @@ with sync_playwright() as p:
         if r["stages"].get("5",{}).get("map",{}).get("settlements")!=48:
             hard.append(r["profile"]+": full map did not reveal 48 settlements")
         if not r["stages"]["0"].get("legendHidden"): hard.append(r["profile"]+": legend exposed during staged reveal")
-        if not r["stages"]["0"].get("musicHidden"): hard.append(r["profile"]+": music button exposed during tutorial")
+        if not r["stages"]["0"].get("musicExists"): hard.append(r["profile"]+": music button was not created")
+        elif not r["stages"]["0"].get("musicHidden"): hard.append(r["profile"]+": music button exposed during tutorial")
         if not r["stages"]["0"].get("timeControlsDisabled"): hard.append(r["profile"]+": time controls are usable during paused onboarding")
         if not r["stages"]["0"].get("otherTabsDisabled"): hard.append(r["profile"]+": advanced tabs are usable during onboarding")
         if r["stages"]["0"].get("map",{}).get("terrainFields",0)>1: hard.append(r["profile"]+": hidden settlement fields leak into Day 0")
