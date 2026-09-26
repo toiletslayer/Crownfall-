@@ -1,11 +1,23 @@
-name: PR11 UI QA
-# rerun after first browser regression fix
+name: Crownfall UI QA
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - index.html
+      - qa/pr11_ui_qa.py
+      - .github/workflows/pr11-ui-qa.yml
   push:
-    branches:
-      - feature/v1.4.8-first-hour
+    branches: [main]
+    paths:
+      - index.html
+      - qa/pr11_ui_qa.py
+      - .github/workflows/pr11-ui-qa.yml
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: crownfall-ui-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   ui-qa:
     runs-on: ubuntu-latest
@@ -26,5 +38,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pr11-ui-qa
+          name: crownfall-ui-qa
           path: qa-output/
