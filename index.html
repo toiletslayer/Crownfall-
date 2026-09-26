@@ -499,10 +499,22 @@ function skipFirstHour(){
  if(onboardingActive()){world.onboarding.active=false;world.onboarding.stage=6;}markFirstHourSeen();persistOnboardingProgress();$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('Introduction skipped. Realm Steward remains OFF until you enable it.');
 }
 function start(seed='crown-'+Math.floor(Math.random()*999999)){
-  world=createWorld(seed);armyDrafts={};chronicleFilter='all';seenEventCount=world.events.length;selected=world.settlements.find(s=>s.owner===0).id;
-  const firstHour=!firstHourSeen();
-  if(firstHour){world.onboarding={active:true,stage:0};world.playerSteward.policy='off';speed=0;}else speed=.25;
-  const persisted=storeSet('crownfall-autosave',serializeWorld(world));renderAll();showTutorial();updateStorageUi();status(firstHour?'Welcome to Crownfall. Time is paused while you learn your capital.':(persisted?`New world: ${seed}`:`New world: ${seed} · iPhone preview mode: saves are session-only`));
+  const firstHour=!firstHourSeen();let resumedFirstHour=false;
+  if(firstHour){
+    const raw=storeGet('crownfall-autosave');
+    if(raw)try{const saved=deserializeWorld(raw);if(saved.onboarding?.active){world=saved;resumedFirstHour=true;}}catch(e){}
+  }
+  if(!resumedFirstHour)world=createWorld(seed);
+  armyDrafts={};chronicleFilter='all';seenEventCount=world.events.length;
+  const home=world.settlements.find(s=>s.owner===0)?.id??0;
+  if(firstHour){
+    if(!resumedFirstHour){world.onboarding={active:true,stage:0};world.playerSteward.policy='off';}
+    if(onboardingStage()===4){const target=world.settlements[world.onboarding.targetId];if(target&&target.owner===null)selected=target.id;else{world.onboarding.stage=3;delete world.onboarding.targetId;selected=home;}}
+    else selected=home;
+    speed=0;
+  }else{selected=home;speed=.25;}
+  const persisted=storeSet('crownfall-autosave',serializeWorld(world));renderAll();showTutorial();updateStorageUi();
+  status(firstHour?(resumedFirstHour?'First Hour resumed. Time is still paused.':'Welcome to Crownfall. Time is paused while you learn your capital.'):(persisted?`New world: ${seed}`:`New world: ${seed} · iPhone preview mode: saves are session-only`));
 }
 function focusTutorialTarget(stage){
   const panel=$('#panel');if(!panel)return;
