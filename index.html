@@ -322,6 +322,7 @@ function resolveArmy(w,a,rng){
    else {returnSurvivors(w,a,a.units);w.events.push({day:w.day,type:'move',actors:[a.owner,target.owner],settlement:target.id,text:`${attacker.name}'s army stood down at ${target.name} after the alliance was recognized.`});}
    return;
  }
+ if(a.mission==='reinforce'){returnSurvivors(w,a,a.units);w.events.push({day:w.day,type:'move',actors:[a.owner,target.owner].filter(x=>x!==null),settlement:target.id,text:`${attacker.name}'s reinforcements stood down because ${target.name} is no longer friendly.`});return;}
  const defenderOwner=target.owner; const attackerBefore=clone(a.units); const defenderBefore=clone(target.troops); const baseDefense=22+target.buildings.keep*9+armyPower(target.troops,false); const wallMultiplier=1+target.buildings.walls*0.18;
  const attack=armyPower(a.units,true)*(0.9+rng()*0.22); const defense=settlementDefense(target)*(0.9+rng()*0.22); const win=attack>defense;w.stats.battles++;
  const intensity=clamp(Math.min(attack,defense)/Math.max(attack,defense),0.1,1); const atkLoss=win?0.18+0.38*intensity:0.48+0.45*intensity; const defLoss=win?0.5+0.42*intensity:0.15+0.34*intensity; const survivors=applyCasualties(a.units,clamp(atkLoss,0,0.93)); target.troops=applyCasualties(target.troops,clamp(defLoss,0,0.96)); const defenderAfter=clone(target.troops);
