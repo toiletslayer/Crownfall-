@@ -452,7 +452,8 @@ const toRoman=n=>['0','I','II','III','IV','V','VI','VII','VIII'][n]||n;
 
 const __memoryStore=new Map();
 const FIRST_HOUR_V148_KEY='crownfall-first-hour-v148-seen';
-let __persistentStorage=true;
+const FIRST_HOUR_PROGRESS_KEY='crownfall-first-hour-v148-progress';
+let __persistentStorage=true,firstHourReturnRaw=null;
 function storeGet(key){
   if(!__persistentStorage)return __memoryStore.has(key)?__memoryStore.get(key):null;
   try{const v=window.localStorage.getItem(key);if(v!==null)__memoryStore.set(key,v);return v;}
@@ -462,6 +463,12 @@ function storeSet(key,value){
   const v=String(value);__memoryStore.set(key,v);
   if(!__persistentStorage)return false;
   try{window.localStorage.setItem(key,v);return true;}
+  catch(e){__persistentStorage=false;updateStorageUi();return false;}
+}
+function storeRemove(key){
+  __memoryStore.delete(key);
+  if(!__persistentStorage)return false;
+  try{window.localStorage.removeItem(key);return true;}
   catch(e){__persistentStorage=false;updateStorageUi();return false;}
 }
 function updateStorageUi(){
@@ -510,22 +517,51 @@ function introVisibleSettlementIds(){
 }
 function firstHourSeen(){return !!storeGet(FIRST_HOUR_V148_KEY)||!!storeGet('crownfall-first-hour-complete');}
 function markFirstHourSeen(){storeSet(FIRST_HOUR_V148_KEY,'1');storeSet('crownfall-first-hour-complete','1');storeSet('crownfall-tutorial-seen','1');}
-function persistOnboardingProgress(){if(world)storeSet('crownfall-autosave',serializeWorld(world));}
+function persistOnboardingProgress(){if(world&&onboardingActive())storeSet(FIRST_HOUR_PROGRESS_KEY,serializeWorld(world));}
+function applySerializedWorld(raw,loadedSpeed=0){
+  world=deserializeWorld(raw);
+  if(world.onboarding?.active&&firstHourSeen()){world.onboarding.active=false;world.onboarding.stage=6;}
+  armyDrafts={};chronicleFilter='all';seenEventCount=world.events.length;
+  const home=world.settlements.find(s=>s.owner===0)?.id??0;
+  if(onboardingActive()&&onboardingStage()===4){
+    const target=world.settlements[world.onboarding.targetId];
+    if(target&&target.owner===null)selected=target.id;
+    else{world.onboarding.stage=3;delete world.onboarding.targetId;selected=home;persistOnboardingProgress();}
+  }else selected=home;
+  speed=onboardingActive()?0:loadedSpeed;
+  renderAll();showTutorial();updateStorageUi();
+  return world;
+}
+function restorePreTutorialCampaign(message){
+  if(!firstHourReturnRaw)return false;
+  const raw=firstHourReturnRaw;firstHourReturnRaw=null;
+  try{applySerializedWorld(raw,0);status(message);return true;}
+  catch(e){return false;}
+}
+function finalizeFirstHour({startClock=false,skipped=false}={}){
+  if(onboardingActive()){world.onboarding.active=false;world.onboarding.stage=6;}
+  markFirstHourSeen();storeRemove(FIRST_HOUR_PROGRESS_KEY);
+  if(restorePreTutorialCampaign(skipped?'First Hour skipped. Your existing campaign was restored paused.':'First Hour complete. Your existing campaign was restored paused.'))return;
+  storeSet('crownfall-autosave',serializeWorld(world));
+  $('#tutorial').classList.add('hidden');speed=startClock?.25:0;renderAll();
+  status(skipped?'Introduction skipped. Realm Steward remains OFF until you enable it.':(startClock?'The Marches are open. Time is running at normal speed; your Realm Steward remains OFF until you enable it.':'Introduction complete. Time remains paused; Realm Steward is OFF.'));
+}
 function introAdvance(stage){
- if(!onboardingActive())return;world.onboarding.stage=Math.max(world.onboarding.stage||0,stage);persistOnboardingProgress();renderAll();showTutorial();
+  if(!onboardingActive())return;world.onboarding.stage=Math.max(world.onboarding.stage||0,stage);persistOnboardingProgress();renderAll();showTutorial();
 }
 function finishFirstHour(){
- if(!onboardingActive())return;world.onboarding.active=false;world.onboarding.stage=6;markFirstHourSeen();persistOnboardingProgress();$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('The Marches are open. Time is running at normal speed; your Realm Steward remains OFF until you enable it.');
+  if(!onboardingActive())return;finalizeFirstHour({startClock:true,skipped:false});
 }
 function skipFirstHour(){
- if(onboardingActive()){world.onboarding.active=false;world.onboarding.stage=6;}markFirstHourSeen();persistOnboardingProgress();$('#tutorial').classList.add('hidden');speed=.25;renderAll();status('Introduction skipped. Realm Steward remains OFF until you enable it.');
+  finalizeFirstHour({startClock:true,skipped:true});
 }
 function start(seed='crown-'+Math.floor(Math.random()*999999)){
   const firstHour=!firstHourSeen();let resumedFirstHour=false;
   if(firstHour){
-    const raw=storeGet('crownfall-autosave');
-    if(raw)try{const saved=deserializeWorld(raw);if(saved.onboarding?.active){world=saved;resumedFirstHour=true;}}catch(e){}
-  }
+    firstHourReturnRaw=storeGet('crownfall-autosave')||storeGet('crownfall-save')||null;
+    const raw=storeGet(FIRST_HOUR_PROGRESS_KEY);
+    if(raw)try{const saved=deserializeWorld(raw);if(saved.onboarding?.active){world=saved;resumedFirstHour=true;}}catch(e){storeRemove(FIRST_HOUR_PROGRESS_KEY);}
+  }else firstHourReturnRaw=null;
   if(!resumedFirstHour)world=createWorld(seed);
   armyDrafts={};chronicleFilter='all';seenEventCount=world.events.length;
   const home=world.settlements.find(s=>s.owner===0)?.id??0;
@@ -533,10 +569,16 @@ function start(seed='crown-'+Math.floor(Math.random()*999999)){
     if(!resumedFirstHour){world.onboarding={active:true,stage:0};world.playerSteward.policy='off';}
     if(onboardingStage()===4){const target=world.settlements[world.onboarding.targetId];if(target&&target.owner===null)selected=target.id;else{world.onboarding.stage=3;delete world.onboarding.targetId;selected=home;}}
     else selected=home;
-    speed=0;
-  }else{selected=home;speed=.25;}
-  const persisted=storeSet('crownfall-autosave',serializeWorld(world));renderAll();showTutorial();updateStorageUi();
-  status(firstHour?(resumedFirstHour?'First Hour resumed. Time is still paused.':'Welcome to Crownfall. Time is paused while you learn your capital.'):(persisted?`New world: ${seed}`:`New world: ${seed} · iPhone preview mode: saves are session-only`));
+    speed=0;persistOnboardingProgress();
+  }else{selected=home;speed=.25;storeSet('crownfall-autosave',serializeWorld(world));}
+  renderAll();showTutorial();updateStorageUi();
+  status(firstHour?(resumedFirstHour?'First Hour resumed. Time is still paused.':'Welcome to Crownfall. Time is paused while you learn your capital.'):(__persistentStorage?`New world: ${seed}`:`New world: ${seed} · iPhone preview mode: saves are session-only`));
+}
+function bootGame(){
+  if(!firstHourSeen()){start('alder-crown-1');return;}
+  const raw=storeGet('crownfall-autosave')||storeGet('crownfall-save');
+  if(raw)try{applySerializedWorld(raw,0);status(__persistentStorage?'Campaign resumed from autosave. Time is paused.':'Session campaign resumed. Time is paused.');return;}catch(e){}
+  start('alder-crown-1');
 }
 function focusTutorialTarget(stage){
   const panel=$('#panel');if(!panel)return;
@@ -575,8 +617,8 @@ function showTutorial(){
   else if(stage===2)t.innerHTML=`<div class="introKicker">FIRST HOUR · GARRISON</div><b>Now recruit your first troops.</b><br><br>Recruit <b>5 Militia</b>. On mobile, tap <b>Recruit</b> to jump straight to the garrison. Raiders and Cavalry are temporarily hidden so you can learn the basic controls without a wall of unit choices.<div class="introGoal">Goal: Recruit 5 Militia</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
   else if(stage===3)t.innerHTML=`<div class="introKicker">FIRST HOUR · NEIGHBORS</div><b>Your local frontier is now visible.</b><br><br>The settlements connected to your capital are its immediate neighbors. Tap an <b>Independent</b> neighbor to inspect its Keep, Walls, and defenses. Time is still paused.<div class="introGoal">Goal: Inspect a nearby Independent settlement</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
   else if(stage===4)t.innerHTML=`<div class="introKicker">FIRST HOUR · ORDERS</div><b>This is a potential target.</b><br><br>Use one of the large <b>Raid / Attack / Annex</b> buttons in the target panel. On mobile, tap <b>Actions</b> to jump straight to them. This only prepares an order—it does not send troops yet. Raid steals resources; Annex costs <b>35 Influence</b> if the battle succeeds.<div class="introGoal">Goal: Prepare an order against this neighbor</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
-  else t.innerHTML=`<div class="introKicker">FIRST HOUR · THE MARCHES</div><b>Now you can see the whole campaign.</b><br><br>You know the basic loop: develop your settlement, recruit troops, inspect a neighbor, and prepare an army order. Your Realm Steward is still <b>OFF</b>, so it cannot spend anything behind your back. Turn it on later from the Realm tab when you want automation.<div class="introGoal">The Founding Truce protects sovereign realms until day ${FOUNDING_TRUCE_DAYS}.</div><div class="introActions"><button id="introSkip">Keep paused</button><button id="introFinish">Start the clock</button></div>`;
-  $('#introSkip')?.addEventListener('click',stage>=5?()=>{world.onboarding.active=false;world.onboarding.stage=6;markFirstHourSeen();persistOnboardingProgress();t.classList.add('hidden');renderAll();status('Introduction complete. Time remains paused; Realm Steward is OFF.');}:skipFirstHour);
+  else {const returning=!!firstHourReturnRaw;t.innerHTML=`<div class="introKicker">FIRST HOUR · THE MARCHES</div><b>Now you can see the whole campaign.</b><br><br>You know the basic loop: develop your settlement, recruit troops, inspect a neighbor, and prepare an army order. Your Realm Steward is still <b>OFF</b>, so it cannot spend anything behind your back. Turn it on later from the Realm tab when you want automation.<div class="introGoal">The Founding Truce protects sovereign realms until day ${FOUNDING_TRUCE_DAYS}.</div><div class="introActions"><button id="introSkip">${returning?'Return paused':'Keep paused'}</button><button id="introFinish">${returning?'Return to campaign':'Start the clock'}</button></div>`;}
+  $('#introSkip')?.addEventListener('click',stage>=5?()=>finalizeFirstHour({startClock:false,skipped:false}):skipFirstHour);
   $('#introNext')?.addEventListener('click',()=>introAdvance(1));
   $('#introFinish')?.addEventListener('click',finishFirstHour);
   focusTutorialTarget(stage);
@@ -755,13 +797,13 @@ function showBattleReport(id){
 $$('.tab').forEach(b=>b.onclick=()=>{activeTab=b.dataset.tab;renderPanel();});
 $$('[data-speed]').forEach(b=>b.onclick=()=>{speed=Number(b.dataset.speed);renderHeader();});
 $('#save').onclick=()=>{const ok=storeSet('crownfall-save',serializeWorld(world));saveStatus(ok);};
-$('#load').onclick=()=>{const s=storeGet('crownfall-save')||storeGet('crownfall-autosave');if(!s)return status('No save found.');try{world=deserializeWorld(s);if(world.onboarding?.active&&firstHourSeen()){world.onboarding.active=false;world.onboarding.stage=6;}armyDrafts={};seenEventCount=world.events.length;const home=owned()[0]?.id??0;if(onboardingActive()&&onboardingStage()===4){const target=world.settlements[world.onboarding.targetId];if(target&&target.owner===null)selected=target.id;else{world.onboarding.stage=3;delete world.onboarding.targetId;selected=home;persistOnboardingProgress();}}else selected=home;if(onboardingActive())speed=0;renderAll();showTutorial();updateStorageUi();status(__persistentStorage?'Save loaded.':'Session save loaded.');}catch(e){status('Save could not be loaded.');}};
+$('#load').onclick=()=>{const raw=storeGet('crownfall-save')||storeGet('crownfall-autosave');if(!raw)return status('No save found.');try{applySerializedWorld(raw,0);status(__persistentStorage?'Save loaded. Time is paused.':'Session save loaded. Time is paused.');}catch(e){status('Save could not be loaded.');}};
 $('#newGame').onclick=()=>{if(confirm('Generate a new Marches? Your manual save is kept.'))start();};
 $('#help').onclick=()=>showHelp();$('#threatPause').onclick=()=>{pauseOnThreat=!pauseOnThreat;$('#threatPause').textContent=`Threat Pause: ${pauseOnThreat?'ON':'OFF'}`;status(`Automatic threat pause ${pauseOnThreat?'enabled':'disabled'}.`);};$('#closeModal').onclick=()=>$('#modal').classList.add('hidden');
 function showHelp(){const m=$('#modal');$('#modalContent').innerHTML=`<h2>How to Rule the Marches</h2><ol><li><b>Equal opening.</b> All six crowns start with one capital. Until day ${FOUNDING_TRUCE_DAYS}, kingdoms may conquer independent settlements but cannot attack one another.</li><li><b>Resources.</b> 🌾 Food, 🪵 Wood, and ⛏ Iron belong to each settlement. ✦ Influence belongs to your whole realm; Annex costs 35 and Envoy costs 12.</li><li><b>Grow your economy.</b> Farms make food and raise troop-supply capacity; Lumber Camps make wood; Mines make iron. Militia/Spearmen use 1 supply each, Raiders 2, Cavalry 3. If a settlement is over capacity after reinforcements arrive, its existing troops remain but it cannot recruit more until space is available.</li><li><b>Use the Realm Steward.</b> The guided first world leaves the Steward OFF until you choose to enable it. On later new worlds, Balanced is the default and handles routine development/recruitment at the same capped pace as AI administration. You still control armies and diplomacy.</li><li><b>Raise and move armies.</b> Barracks II unlocks Raiders; Barracks III unlocks Cavalry.</li><li><b>Read the field.</b> Threat Pause is ON by default: a new incoming hostile army pauses time so you can inspect and respond.</li><li><b>Expand.</b> Annexation costs 35 Influence and captures the target if you win with survivors.</li><li><b>Win.</b> Either control 58% of the Marches, or hold at least 44% while controlling twice as many settlements as the strongest rival.</li></ol><p><b>AI fairness:</b> rival kingdoms no longer perform one build/recruit cycle per settlement at once. Their administrative and military actions are rate-limited and scale only modestly with realm size. When a frontier cannot muster a viable force, rivals may reinforce it from another holding before trying again.</p>`;m.classList.remove('hidden');}
 window.__CROWNFALL__={getWorld:()=>world,advance:d=>{advanceDays(world,d);renderTick();},auto:(id=0)=>{runAutoplayerAction(world,id);renderAll();},batchAuto:(steps=1,days=10,id=0)=>{for(let i=0;i<steps;i++){runAutoplayerAction(world,id);advanceDays(world,days);}renderAll();},refresh:()=>renderAll(),tickRefresh:()=>renderTick(),save:()=>serializeWorld(world),showReport:id=>showBattleReport(id),prepareOrder:(target,mission)=>prepareOrder(target,mission)};
-function loop(now){const dt=Math.min(250,now-last);last=now;if(speed>0&&!world.defeat){tickAcc+=dt*speed;if(tickAcc>=1000){const days=Math.floor(tickAcc/1000);tickAcc%=1000;const before=world.events.length;advanceDays(world,days);const newEvents=world.events.slice(before);if(pauseOnThreat&&newEvents.some(e=>e.type==='warning'&&Array.isArray(e.actors)&&e.actors.includes(0))){speed=0;status('⚠ Time paused: hostile army incoming. Inspect the map or settlement threat card.');}seenEventCount=world.events.length;if(world.day%15===0)storeSet('crownfall-autosave',serializeWorld(world));renderTick();if(world.victory&&!world.sandbox){world.sandbox=true;const victoryCopy=world.victoryType==='hegemony'?'No rival realm can match your reach. The Marches accept your hegemony.':'You now control the majority of the Marches. Rival courts bend or break before your realm.';$('#modalContent').innerHTML=`<h2>The Crown Ascendant</h2><p>${victoryCopy}</p><p><b>Victory.</b> The simulation will continue in sandbox mode.</p>`;$('#modal').classList.remove('hidden');}}}requestAnimationFrame(loop);}
-start('alder-crown-1');requestAnimationFrame(loop);
+function loop(now){const dt=Math.min(250,now-last);last=now;if(speed>0&&!world.defeat){tickAcc+=dt*speed;if(tickAcc>=1000){const days=Math.floor(tickAcc/1000);tickAcc%=1000;const before=world.events.length;advanceDays(world,days);const newEvents=world.events.slice(before);if(pauseOnThreat&&newEvents.some(e=>e.type==='warning'&&Array.isArray(e.actors)&&e.actors.includes(0))){speed=0;status('⚠ Time paused: hostile army incoming. Inspect the map or settlement threat card.');}seenEventCount=world.events.length;if(world.day%15===0&&!onboardingActive())storeSet('crownfall-autosave',serializeWorld(world));renderTick();if(world.victory&&!world.sandbox){world.sandbox=true;const victoryCopy=world.victoryType==='hegemony'?'No rival realm can match your reach. The Marches accept your hegemony.':'You now control the majority of the Marches. Rival courts bend or break before your realm.';$('#modalContent').innerHTML=`<h2>The Crown Ascendant</h2><p>${victoryCopy}</p><p><b>Victory.</b> The simulation will continue in sandbox mode.</p>`;$('#modal').classList.remove('hidden');}}}requestAnimationFrame(loop);}
+bootGame();requestAnimationFrame(loop);
 
 
 
