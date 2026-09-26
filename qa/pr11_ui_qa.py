@@ -1,3 +1,4 @@
+# PR11 rollout verification: current-head rerun
 import json, os, time, math, pathlib, re
 from playwright.sync_api import sync_playwright
 
