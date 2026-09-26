@@ -548,8 +548,8 @@ function renderAll(){renderHeader();if($('#map')?.querySelector('.settlement'))u
 function renderHeader(){
   $('#day').textContent=`Day ${world.day}`;$('#influence').textContent=`✦ ${Math.floor(world.factions[0].influence)} Influence`;$('#influence').title='Realm-wide currency. Annexation costs 35 Influence; Envoys cost 12.';$('#realm').textContent=`♜ ${owned().length}/${world.settlements.length} Settlements`;$('#phase').textContent=world.day<FOUNDING_TRUCE_DAYS?`☮ Truce ${FOUNDING_TRUCE_DAYS-world.day}d`:'⚔ Open conflict';
   const intro=onboardingActive();
-  $('.time button').forEach(b=>{b.classList.toggle('active',Number(b.dataset.speed)===speed);b.disabled=intro;});
-  $('.tab').forEach(b=>b.disabled=intro&&b.dataset.tab!=='settlement');
+  $$('.time button').forEach(b=>{b.classList.toggle('active',Number(b.dataset.speed)===speed);b.disabled=intro;});
+  $$('.tab').forEach(b=>b.disabled=intro&&b.dataset.tab!=='settlement');
 }
 
 function settlementSvg(s,faction){
