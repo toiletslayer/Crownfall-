@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 BASE="http://127.0.0.1:8000/index.html"
 OUT=pathlib.Path("qa-output"); OUT.mkdir(exist_ok=True)
 
-# Catch the recurring $() vs $() selector-list regression before launching browsers.
+# Catch the recurring $() vs $$() selector-list regression before launching browsers.
 source=pathlib.Path("index.html").read_text(encoding="utf-8")
 bad_selector_lists=[]
 for n,line in enumerate(source.splitlines(),1):
@@ -13,7 +13,7 @@ for n,line in enumerate(source.splitlines(),1):
         bad_selector_lists.append((n,line.strip()))
 if bad_selector_lists:
     raise SystemExit("Single-element selector used with .forEach(): "+repr(bad_selector_lists))
-if "$$(" in source:
+if "$$$(" in source:
     raise SystemExit("Accidental triple-dollar selector found in index.html")
 
 def box(page,sel):
