@@ -120,7 +120,7 @@ Because the UX complaint can be addressed visually without disturbing travel bal
 - Day 0 exposes one settlement, zero roads/bridges, one settlement-linked field/decor marker, and keeps the faction legend/music control hidden.
 - Time controls and Realm/Diplomacy/Chronicle tabs stay disabled throughout onboarding and re-enable afterward.
 - Stage 2 and Stage 3 tutorial progress is written to autosave immediately.
-- Loading a mid-tutorial save restores the matching lesson and keeps time paused.
+- Refreshing or reopening during an unfinished First Hour resumes the autosaved tutorial stage and keeps time paused; Load remains locked until the First Hour is completed or skipped.
 - Stage 4 persists the inspected Independent target; loading restores its target panel and contextual Raid button.
 - A stale Stage 4 save without a target safely falls back to the Neighbors lesson.
 - Legacy version-1 saves without an `onboarding` field still load with tutorial chrome hidden.
