@@ -252,20 +252,22 @@ def persistence_checks(browser):
     page.goto(BASE,wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(300)
-    # Reach stage 2 and save manually.
+
+    # Reach Stage 2. Tutorial progress should be in autosave and resume automatically after refresh.
     click_real(page,"#introNext")
     click_real(page,'[data-build="farms"]')
-    page.locator("#save").click(); page.wait_for_timeout(120)
-    saved_stage=page.evaluate("JSON.parse(localStorage.getItem('crownfall-save')).onboarding.stage")
-    # Advance to stage 3, then load the stage-2 manual save.
-    click_real(page,'[data-recruit="militia"][data-q="5"]')
-    page.locator("#load").click(); page.wait_for_timeout(250)
+    autosave_stage2=page.evaluate("JSON.parse(localStorage.getItem('crownfall-autosave')).onboarding.stage")
+    page.reload(wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(260)
     restored={
       "stage":stage(page),
       "tutorial":page.locator("#tutorial").inner_text(),
-      "timeLocked":page.locator(".time button").evaluate_all("els=>els.every(e=>e.disabled)")
+      "timeLocked":page.locator(".time button").evaluate_all("els=>els.every(e=>e.disabled)"),
+      "loadLocked":page.locator("#load").is_disabled()
     }
-    # Stage 4 depends on the inspected Independent target; that target must survive save/load.
+
+    # Stage 4 depends on the inspected Independent target; refresh must restore that target panel.
     click_real(page,'[data-recruit="militia"][data-q="5"]')
     page.wait_for_timeout(180)
     neutral=page.locator("#map .settlement.neutral").first
@@ -274,33 +276,39 @@ def persistence_checks(browser):
       const w=window.__CROWNFALL__.getWorld();
       return w.settlements[w.onboarding.targetId]?.name || '';
     }""")
-    page.locator("#save").click(); page.wait_for_timeout(100)
-    page.locator("#map .settlement.playerRealm").first.click(); page.wait_for_timeout(100)
-    page.locator("#load").click(); page.wait_for_timeout(220)
+    page.reload(wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(260)
     target_restore={
       "stage":stage(page),
       "targetName":target_name,
       "panelHasTarget":target_name in page.locator("#panel").inner_text(),
       "raidVisible":page.locator('[data-prepare="raid"]').count()>0 and page.locator('[data-prepare="raid"]').first.is_visible()
     }
-    # A stale stage-4 save without a target must safely return to the Neighbors lesson.
+
+    # A stale Stage-4 autosave without a target must recover to the Neighbors lesson on refresh.
     page.evaluate("""() => {
       const w=JSON.parse(window.__CROWNFALL__.save());
       w.onboarding={active:true,stage:4};
-      localStorage.setItem('crownfall-save',JSON.stringify(w));
+      localStorage.setItem('crownfall-autosave',JSON.stringify(w));
+      localStorage.removeItem('crownfall-first-hour-v148-seen');
       localStorage.removeItem('crownfall-first-hour-complete');
       localStorage.removeItem('crownfall-tutorial-seen');
     }""")
-    page.locator("#load").click(); page.wait_for_timeout(220)
+    page.reload(wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(260)
     stale_stage4={"stage":stage(page),"tutorial":page.locator("#tutorial").inner_text()}
-    # A legacy v1 save without onboarding must still load and hide tutorial chrome.
+
+    # Finish the one-time gate via Skip so normal Load behavior is unlocked.
+    page.locator("#introSkip").click(); page.wait_for_timeout(180)
+
+    # A legacy v1 save without onboarding must still load normally after First Hour is seen/skipped.
     page.evaluate("""() => {
       const w=JSON.parse(window.__CROWNFALL__.save());
       delete w.onboarding;
       w.playerSteward.policy='balanced';
       localStorage.setItem('crownfall-save',JSON.stringify(w));
-      localStorage.removeItem('crownfall-first-hour-complete');
-      localStorage.removeItem('crownfall-tutorial-seen');
     }""")
     page.locator("#load").click(); page.wait_for_timeout(250)
     legacy={
@@ -308,13 +316,12 @@ def persistence_checks(browser):
       "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
       "timeUnlocked":page.locator(".time button").evaluate_all("els=>els.every(e=>!e.disabled)")
     }
-    # A stale active tutorial save must be normalized if completion was already recorded.
+
+    # A stale active tutorial manual save must normalize to completed if First Hour was already seen/skipped.
     page.evaluate("""() => {
       const w=JSON.parse(window.__CROWNFALL__.save());
       w.onboarding={active:true,stage:2};
       localStorage.setItem('crownfall-save',JSON.stringify(w));
-      localStorage.setItem('crownfall-first-hour-complete','1');
-      localStorage.setItem('crownfall-tutorial-seen','1');
     }""")
     page.locator("#load").click(); page.wait_for_timeout(250)
     normalized={
@@ -323,7 +330,7 @@ def persistence_checks(browser):
       "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')")
     }
     ctx.close()
-    return {"savedStage":saved_stage,"restored":restored,"targetRestore":target_restore,"staleStage4":stale_stage4,"legacy":legacy,"normalized":normalized}
+    return {"autosaveStage2":autosave_stage2,"restored":restored,"targetRestore":target_restore,"staleStage4":stale_stage4,"legacy":legacy,"normalized":normalized}
 
 with sync_playwright() as p:
     allr=[]
@@ -378,14 +385,14 @@ with sync_playwright() as p:
         if not r["finished"].get("otherTabsEnabled"): hard.append(r["profile"]+": advanced tabs stayed locked after onboarding")
         if not r["finished"].get("loadNewEnabled"): hard.append(r["profile"]+": Load/New Game stayed locked after onboarding")
         if not r["finished"].get("autosaveCompleted"): hard.append(r["profile"]+": completed onboarding was not autosaved")
-    if persistence["savedStage"]!=2: hard.append("persistence: manual tutorial save did not preserve stage 2")
-    if persistence["restored"]["stage"]!=2 or "GARRISON" not in persistence["restored"]["tutorial"] or not persistence["restored"]["timeLocked"]:
-        hard.append("persistence: loading a mid-tutorial save did not restore the correct paused lesson")
+    if persistence["autosaveStage2"]!=2: hard.append("persistence: tutorial Stage 2 was not autosaved")
+    if persistence["restored"]["stage"]!=2 or "GARRISON" not in persistence["restored"]["tutorial"] or not persistence["restored"]["timeLocked"] or not persistence["restored"]["loadLocked"]:
+        hard.append("persistence: refresh did not resume the correct paused Stage-2 lesson")
     tr=persistence["targetRestore"]
     if tr["stage"]!=4 or not tr["panelHasTarget"] or not tr["raidVisible"]:
-        hard.append("persistence: stage-4 inspected target was not restored after load")
+        hard.append("persistence: stage-4 inspected target was not restored after refresh")
     if persistence["staleStage4"]["stage"]!=3 or "NEIGHBORS" not in persistence["staleStage4"]["tutorial"]:
-        hard.append("persistence: stale stage-4 save without target did not recover to Neighbors lesson")
+        hard.append("persistence: stale stage-4 autosave without target did not recover to Neighbors lesson")
     if persistence["legacy"]["hasOnboarding"] or not persistence["legacy"]["tutorialHidden"] or not persistence["legacy"]["timeUnlocked"]:
         hard.append("persistence: legacy v1 save compatibility failed")
     if persistence["normalized"]["active"] or persistence["normalized"]["stage"]!=6 or not persistence["normalized"]["tutorialHidden"]:
