@@ -115,8 +115,22 @@ metrics.recruitmentChecks=500;
   check(api.sendArmy(w,0,home.id,enemy.id,{militia:5},'reinforce').ok,'mission-rules: allied reinforce blocked');
   check(!api.sendArmy(w,0,home.id,neutral.id,{militia:1},'reinforce').ok,'mission-rules: neutral reinforce allowed');
   check(!api.sendArmy(w,0,home.id,neutral.id,{militia:1},'nonsense').ok,'mission-rules: unknown mission allowed');
+
+  // Reinforcements must never turn into attacks if diplomacy changes in transit.
+  const stale=api.sendArmy(w,0,home.id,enemy.id,{militia:6},'reinforce');
+  check(stale.ok,'mission-rules: stale reinforce setup failed');
+  if(stale.ok){
+    w.armies=w.armies.filter(a=>a.id!==stale.army.id);
+    api.setDiplomacy(w,0,1,'peace',0);
+    const beforeTarget=enemy.troops.militia;
+    const beforeHome=home.troops.militia;
+    api.resolveArmy(w,stale.army,()=>0.5);
+    check(enemy.troops.militia===beforeTarget,'mission-rules: stale reinforce altered former ally garrison');
+    check(home.troops.militia===beforeHome+6,'mission-rules: stale reinforce did not return home');
+    check(w.battleReports.length===0,'mission-rules: stale reinforce created a battle report');
+  }
 }
-metrics.missionRuleChecks=7;
+metrics.missionRuleChecks=11;
 
 // Diplomacy costs and truce.
 {
