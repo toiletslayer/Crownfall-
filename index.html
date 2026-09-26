@@ -678,8 +678,8 @@ function renderSettlement(){
   h+=battleLinks(s.id);
   $('#panel').innerHTML=h;
   wireMobileJumps();
-  $('[data-build]').forEach(b=>b.onclick=()=>{const key=b.dataset.build,r=upgradeBuilding(world,selected,key);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===1&&key==='farms'){world.onboarding.stage=2;persistOnboardingProgress();}renderAll();showTutorial();});
-  $('[data-recruit]').forEach(b=>b.onclick=()=>{const key=b.dataset.recruit,qty=Number(b.dataset.q),r=recruit(world,selected,key,qty);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===2&&key==='militia'&&qty>=5){world.onboarding.stage=3;persistOnboardingProgress();}renderAll();showTutorial();});
+  $$('[data-build]').forEach(b=>b.onclick=()=>{const key=b.dataset.build,r=upgradeBuilding(world,selected,key);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===1&&key==='farms'){world.onboarding.stage=2;persistOnboardingProgress();}renderAll();showTutorial();});
+  $$('[data-recruit]').forEach(b=>b.onclick=()=>{const key=b.dataset.recruit,qty=Number(b.dataset.q),r=recruit(world,selected,key,qty);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===2&&key==='militia'&&qty>=5){world.onboarding.stage=3;persistOnboardingProgress();}renderAll();showTutorial();});
   if(mine)wireArmyDraft(s);$('#sendArmy')?.addEventListener('click',sendFromPanel);$('#toDip')?.addEventListener('click',()=>{activeTab='diplomacy';renderPanel();});
   $$('[data-prepare]').forEach(b=>b.onclick=()=>prepareOrder(s.id,b.dataset.prepare));$$('[data-report]').forEach(b=>b.onclick=()=>showBattleReport(Number(b.dataset.report)));
 }
