@@ -112,13 +112,16 @@ def desktop_journey(browser):
     page.locator("#u_militia").fill("5")
     for k in ["spears","raiders","cavalry"]:
         if page.locator(f"#u_{k}").count(): page.locator(f"#u_{k}").fill("0")
-    before_ally=page.evaluate(f"window.__CROWNFALL__.getWorld().settlements[{ally_sid}].troops.militia")
+    reports_before_reinforce=page.evaluate("window.__CROWNFALL__.getWorld().battleReports.length")
     click(page,"#sendArmy");page.wait_for_timeout(100)
     army=page.evaluate("window.__CROWNFALL__.getWorld().armies.find(a=>a.owner===0&&a.mission==='reinforce')")
+    reinforce_id=army["id"] if army else None
     if army:
         delta=max(1,army["arriveDay"]-page.evaluate("window.__CROWNFALL__.getWorld().day"))
         page.evaluate(f"window.__CROWNFALL__.advance({delta})");page.wait_for_timeout(120)
-    after_ally=page.evaluate(f"window.__CROWNFALL__.getWorld().settlements[{ally_sid}].troops.militia")
+    reinforce_event=page.evaluate("""() => window.__CROWNFALL__.getWorld().events.slice().reverse().find(e=>/Allied reinforcements reached/i.test(e.text||''))?.text || ''""")
+    reinforce_gone=(page.evaluate(f"window.__CROWNFALL__.getWorld().armies.some(a=>a.id==={reinforce_id})") is False) if reinforce_id is not None else False
+    reinforce_no_battle=page.evaluate("window.__CROWNFALL__.getWorld().battleReports.length")==reports_before_reinforce
     result["alliance"]={
       "envoyRelationGain":rel1-rel0,
       "envoyInfluenceSpent":inf0-inf1,
@@ -127,7 +130,9 @@ def desktop_journey(browser):
       "alliedSupport":allied_support,
       "hostileButtonsOnAlly":hostile_on_ally,
       "missionText":mission_text,
-      "reinforcementArrived":after_ally>=before_ally+5
+      "reinforcementDispatched":army is not None,
+      "reinforcementArrived":bool(reinforce_event) and reinforce_gone and reinforce_no_battle,
+      "reinforcementEvent":reinforce_event
     }
 
     # Guaranteed UI raid against an Independent, then battle report via Chronicle.
@@ -174,19 +179,24 @@ def desktop_journey(browser):
       window.__CROWNFALL__.refresh();
     }}""")
     inf_before=page.evaluate("window.__CROWNFALL__.getWorld().factions[0].influence")
+    daily_inf=page.evaluate("""() => window.__CROWNFALL__.getWorld().settlements.filter(s=>s.owner===0).reduce((n,s)=>n+.22+s.buildings.hall*.16,0)""")
     page.locator(f'#map .settlement[data-id="{setup["target"]}"]').click();page.wait_for_timeout(80)
     page.locator('[data-prepare="annex"]').click();page.wait_for_timeout(80)
     for k,v in {"militia":"50","spears":"25","raiders":"15","cavalry":"5"}.items():
         if page.locator(f"#u_{k}").count(): page.locator(f"#u_{k}").fill(v)
     click(page,"#sendArmy");page.wait_for_timeout(80)
     annex_army=page.evaluate("window.__CROWNFALL__.getWorld().armies.find(a=>a.owner===0&&a.mission==='annex')")
+    annex_days=0
     if annex_army:
-        delta=max(1,annex_army["arriveDay"]-page.evaluate("window.__CROWNFALL__.getWorld().day"))
-        page.evaluate(f"window.__CROWNFALL__.advance({delta})");page.wait_for_timeout(100)
+        annex_days=max(1,annex_army["arriveDay"]-page.evaluate("window.__CROWNFALL__.getWorld().day"))
+        page.evaluate(f"window.__CROWNFALL__.advance({annex_days})");page.wait_for_timeout(100)
     owner_after=page.evaluate(f"window.__CROWNFALL__.getWorld().settlements[{setup['target']}].owner")
     inf_after=page.evaluate("window.__CROWNFALL__.getWorld().factions[0].influence")
     annex_report=page.evaluate("window.__CROWNFALL__.getWorld().battleReports.slice().reverse().find(r=>r.annexed)")
-    result["annex"]={"owner":owner_after,"influenceSpent":inf_before-inf_after,
+    effective_spend=inf_before+(daily_inf*annex_days)-inf_after
+    result["annex"]={"owner":owner_after,"netInfluenceDrop":inf_before-inf_after,
+                     "travelDays":annex_days,"generatedInfluence":daily_inf*annex_days,
+                     "effectiveSpend":effective_spend,
                      "reportSpent":annex_report["influenceSpent"] if annex_report else None}
 
     # Post-truce war button and actual relation transition.
@@ -236,11 +246,11 @@ def desktop_journey(browser):
 
 def storage_fallback_journey(browser):
     ctx=browser.new_context(viewport={"width":1000,"height":760})
-    ctx.add_init_script("""() => {
+    ctx.add_init_script("""(() => {
       for (const name of ['getItem','setItem','removeItem']) {
-        Object.defineProperty(Storage.prototype,name,{configurable:true,value:function(){throw new DOMException('blocked','SecurityError');}});
+        Object.defineProperty(Storage.prototype,name,{configurable:true,writable:true,value:function(){throw new DOMException('blocked','SecurityError');}});
       }
-    }""")
+    })();""")
     page=ctx.new_page();errors=[];page.on("pageerror",lambda e:errors.append(str(e)))
     page.goto(BASE,wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
@@ -373,10 +383,10 @@ if not all(d["buildRecruitSave"].values()): fails.append("desktop: build/recruit
 if d["steward"]!={"military":"military","off":"off"}: fails.append("desktop: steward policy buttons failed")
 a=d["alliance"]
 if a["envoyRelationGain"]!=54 or a["envoyInfluenceSpent"]!=36 or a["status"]!="alliance": fails.append("desktop: diplomacy/envoy/alliance flow failed")
-if not a["alliedSupport"] or a["hostileButtonsOnAlly"]!=0 or "Reinforce" not in a["missionText"] or not a["reinforcementArrived"]: fails.append("desktop: allied reinforcement UI/arrival failed")
+if not a["alliedSupport"] or a["hostileButtonsOnAlly"]!=0 or "Reinforce" not in a["missionText"] or not a["reinforcementDispatched"] or not a["reinforcementArrived"]: fails.append("desktop: allied reinforcement UI/arrival failed")
 r=d["raidReport"]
 if not r["raidButtonVisible"] or not r["newReport"] or r["raidStat"]<1 or not r["reportModal"] or "Survivors" not in r["reportText"]: fails.append("desktop: raid/Chronicle/report flow failed")
-if d["annex"]["owner"]!=0 or d["annex"]["influenceSpent"]!=35 or d["annex"]["reportSpent"]!=35: fails.append("desktop: annex flow/accounting failed")
+if d["annex"]["owner"]!=0 or abs(d["annex"]["effectiveSpend"]-35)>1e-6 or d["annex"]["reportSpent"]!=35: fails.append("desktop: annex flow/accounting failed")
 if not d["war"]["enabledAfterTruce"] or d["war"]["status"]!="war": fails.append("desktop: post-truce war flow failed")
 if not d["threatPause"]["warning"] or not d["threatPause"]["pauseActive"] or d["threatPause"]["incomingArmies"]<1: fails.append("desktop: Threat Pause failed")
 if not d["newWorld"]["seedChanged"] or d["newWorld"]["tutorialActive"] or d["newWorld"]["steward"]!="balanced" or not d["newWorld"]["manualSaveRestored"]: fails.append("desktop: New World/manual-save behavior failed")
