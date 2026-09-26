@@ -155,12 +155,16 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
       "river":river_audit(page),"tutorial":page.locator("#tutorial").inner_text()}
     snap(page,f"{name}-05-full-map.png")
 
-    # Finish/start clock, confirm tutorial disappears and day can advance.
+    # Finish/start clock, confirm tutorial disappears and Day 1 is actually reached.
     click_real(page,"#introFinish")
-    page.wait_for_timeout(4300)
+    day_advanced=True
+    try:
+        page.wait_for_function("window.__CROWNFALL__.getWorld().day >= 1",timeout=8000)
+    except:
+        day_advanced=False
     result["finished"]={"world":world(page),"tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
       "normalSpeedActive":page.locator('.time [data-speed="0.25"]').evaluate("e=>e.classList.contains('active')"),
-      "map":map_counts(page)}
+      "dayAdvanced":day_advanced,"map":map_counts(page)}
     snap(page,f"{name}-06-running.png")
     if name.startswith("desktop"):
         samples=[]
@@ -210,5 +214,6 @@ with sync_playwright() as p:
         if geo.get("uncoveredClose",0): hard.append(r["profile"]+": river still visually crosses an uncleared settlement")
         if geo.get("bridgeCount")!=geo.get("visualCrossings"): hard.append(r["profile"]+": bridge count does not match visual river crossings")
         if not r["finished"].get("normalSpeedActive"): hard.append(r["profile"]+": Start the clock did not select normal speed")
+        if not r["finished"].get("dayAdvanced"): hard.append(r["profile"]+": Start the clock did not advance to Day 1")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
