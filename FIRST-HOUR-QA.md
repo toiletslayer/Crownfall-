@@ -93,7 +93,7 @@ The v1.4 river now:
 - places dry ground beneath the rare unavoidable settlement crossing;
 - draws bridge decks where existing roads cross the river.
 
-A 300-world route-selection test found the selected route averaged fewer than one settlement within 4 map units of the river centerline (0.77/world), with no tested world exceeding two such close settlements.
+The route scorer now balances two competing goals: avoid settlements first, while also penalizing rivers that hug the outer map edge. A 500-world merge-risk audit of the current scorer averaged about 1.4 settlements within 4 map units of the river centerline, with a worst case of 3; those close cases receive explicit dry-ground treatment. In the browser QA sample, every close settlement was covered and bridge counts matched visual road/river crossings exactly. A stricter scorer that eliminated all rare 3-town cases pushed too many rivers back toward the edge, so the current balance is intentional.
 
 ### Roads
 
@@ -112,19 +112,44 @@ Because the UX complaint can be addressed visually without disturbing travel bal
 ## Regression checks
 
 - JavaScript parse check: PASS.
+- Selector-list audit: PASS; no single-element `$()` selector is used with `.forEach()`.
 - 60-world simulation smoke test to day 1500: 38 wins / 0 defeats / 22 unresolved.
+- 500 generated-world tutorial seed audit: all 500 could afford Farms II → III and 5 Militia; every capital had at least one connected neighbor.
+- Desktop Chromium guided flow: PASS.
+- iPhone-sized WebKit (390×844, touch enabled) guided flow: PASS.
+- Day 0 exposes one settlement, zero roads/bridges, one settlement-linked field/decor marker, and keeps the faction legend/music control hidden.
+- Time controls and Realm/Diplomacy/Chronicle tabs stay disabled throughout onboarding and re-enable afterward.
+- Stage 2 and Stage 3 tutorial progress is written to autosave immediately.
+- Loading a mid-tutorial save restores the matching lesson and keeps time paused.
+- Stage 4 persists the inspected Independent target; loading restores its target panel and contextual Raid button.
+- A stale Stage 4 save without a target safely falls back to the Neighbors lesson.
+- Legacy version-1 saves without an `onboarding` field still load with tutorial chrome hidden.
+- A completed user cannot be trapped by an older active-onboarding save; it normalizes to completed Stage 6.
+- “Start the clock” selects normal speed and reaches Day 1 in both browser profiles.
+- Bridge count matches actual curved-river road crossings in the browser sample, with zero uncovered close settlements.
 - No Siege Crew or siege mechanic is included.
 - No road-topology change is included.
 - Existing save schema remains version 1.
+- The UI QA workflow now runs on pull requests to `main`, pushes to `main`, and manual dispatch, so it remains useful after this feature branch is merged/deleted.
 
-## Still needs human visual testing
+## Merge-risk review
 
-Before merge, check on desktop and iPhone:
+The focused merge-risk pass found and fixed issues that the initial visual QA did not cover:
 
-- tutorial does not obscure the required controls;
-- Farm and Recruit buttons remain easy to reach while tutorial is open;
-- staged map reveal feels intentional rather than broken;
-- resource labels remain readable without crowding mobile cards;
-- bridges and river clearings look like geography rather than artifacts;
-- full-map reveal after preparing the first order feels smooth.
+- onboarding progress previously could be lost before the normal Day-15 autosave;
+- loading an onboarding save did not rebuild the matching tutorial state;
+- a stale completed-user autosave could reopen an active tutorial world;
+- Stage 4 depended on non-persisted UI selection state;
+- time and advanced tabs could still be used during the supposedly paused tutorial;
+- hidden settlement-linked fields/decor could leak map information;
+- the QA workflow originally only ran on the feature branch and would have gone dormant after merge;
+- the page title still said `v1.4.8-dev`;
+- several selector-list regressions were caught and fixed before merge.
+
+## Known residuals / intentional behavior
+
+- Returning players who already have the older `crownfall-tutorial-seen` flag are **not forced** through the new first-hour flow. For retesting the onboarding itself, use a fresh/private browser session or clear Crownfall site data.
+- This QA uses iPhone-sized WebKit rather than a physical iPhone. A real-device spot check is still worthwhile after deployment, but there is no current browser-QA blocker.
+- The river scorer can still place up to three settlements close to the river in rare generated worlds; dry-ground treatment prevents water from visibly running underneath those towns.
+- Barracks IV–VI still have no new troop unlock or documented mechanical benefit. That is pre-existing game-design debt, not introduced by this PR.
 
