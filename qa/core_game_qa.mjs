@@ -200,8 +200,14 @@ metrics.saveChecks=180;
   check(w.victory&&w.victoryType==='hegemony','state: hegemony victory failed');
   w=api.createWorld('defeat');for(const s of w.settlements)if(s.owner===0)s.owner=null;api.checkStates(w);
   check(w.defeat,'state: defeat failed');
+
+  // State changes are recognized on the next simulated day, not delayed to a 10-day boundary.
+  w=api.createWorld('immediate-defeat');w.day=101;for(const s of w.settlements)if(s.owner===0)s.owner=null;api.advanceDays(w,1);
+  check(w.defeat&&w.day===102,'state: defeat recognition was delayed');
+  w=api.createWorld('immediate-victory');w.day=101;for(let i=0;i<28;i++)w.settlements[i].owner=0;api.advanceDays(w,1);
+  check(w.victory&&w.day===102,'state: victory recognition was delayed');
 }
-metrics.stateChecks=3;
+metrics.stateChecks=5;
 
 // Long-running human-like campaigns and battle-report arithmetic.
 let reports=0;const outcomes={victory:0,defeat:0,unresolved:0};
