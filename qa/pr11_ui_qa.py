@@ -234,14 +234,17 @@ def returning_player_rollout_checks(browser):
     page.wait_for_timeout(180)
     after_skip={
       "marker":page.evaluate("localStorage.getItem('crownfall-first-hour-v148-seen')"),
-      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active")
+      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
+      "settlements":page.locator("#map .settlement").count(),
+      "roads":page.locator("#roads .road").count()
     }
     page.reload(wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(220)
     no_repeat={
       "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
-      "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')")
+      "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
+      "settlements":page.locator("#map .settlement").count()
     }
     ctx.close()
     return {"shownOnce":shown_once,"afterSkip":after_skip,"noRepeat":no_repeat}
@@ -405,7 +408,13 @@ with sync_playwright() as p:
         hard.append("rollout: returning player can bypass First Hour via Load/New Game")
     if rollout["afterSkip"]["marker"]!="1" or rollout["afterSkip"]["active"]:
         hard.append("rollout: skipping First Hour did not persist v1.4.8 completion")
+    if rollout["afterSkip"]["settlements"]!=48:
+        hard.append("rollout: skipping First Hour did not immediately reveal all 48 settlements")
+    if rollout["afterSkip"]["roads"]<1:
+        hard.append("rollout: skipping First Hour did not restore the full road map")
     if rollout["noRepeat"]["active"] or not rollout["noRepeat"]["tutorialHidden"]:
         hard.append("rollout: v1.4.8 First Hour repeated after being skipped once")
+    if rollout["noRepeat"]["settlements"]!=48:
+        hard.append("rollout: reload after skip did not preserve full-map reveal")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
