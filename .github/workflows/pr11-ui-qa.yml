@@ -1,0 +1,58 @@
+name: Crownfall UI QA
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - index.html
+      - qa/pr11_ui_qa.py
+      - qa/core_game_qa.mjs
+      - qa/full_game_qa.py
+      - .github/workflows/pr11-ui-qa.yml
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - qa/pr11_ui_qa.py
+      - qa/core_game_qa.mjs
+      - qa/full_game_qa.py
+      - .github/workflows/pr11-ui-qa.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: crownfall-ui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify tested revision
+        run: |
+          echo "Testing $(git rev-parse HEAD)"
+          git status --short
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright
+      - run: python -m playwright install --with-deps chromium webkit
+      - name: Run whole-game core QA
+        run: node qa/core_game_qa.mjs
+      - name: Start static server
+        run: |
+          python -m http.server 8000 >/tmp/crownfall-http.log 2>&1 &
+          sleep 2
+      - name: Run focused onboarding UI QA
+        run: python qa/pr11_ui_qa.py
+      - name: Run whole-game browser QA
+        run: python qa/full_game_qa.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crownfall-ui-qa
+          path: |
+            qa-output/
+            qa-output-full/

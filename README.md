@@ -10,6 +10,22 @@ The GitHub Pages build is the recommended version on phones and tablets. It runs
 
 The standalone HTML build remains available for desktop/offline use.
 
+## v1.4.8 first-hour UX pass — development
+
+This branch addresses fresh-player feedback before adding more combat systems.
+
+- **Guided first hour:** first-time players start paused with only their capital visible. The game introduces one Farm upgrade, a Militia recruitment, local neighbors, settlement inspection, and order preparation before revealing the full Marches. Returning v1.4.7 players see this redesigned First Hour once as well, with an immediate Skip First Hour option.
+- **No invisible automation during onboarding:** the Realm Steward starts OFF for the guided introduction and remains OFF until the player chooses to enable it.
+- **Progressive unit disclosure:** Raiders and Cavalry are hidden during the first recruitment lesson, then revealed after the player recruits Militia.
+- **Readable resources:** Food, Wood, Iron, and Influence are named explicitly rather than relying on icons alone. Zero-value cost chips are omitted.
+- **Explain Influence spending:** the UI identifies Influence as realm-wide currency and states Annex (35) and Envoy (12) costs; annex battle reports show the Influence spend.
+- **Exact upgrade effects:** building cards show before/after production, supply, storage, defense multiplier, Influence generation, or troop unlocks before spending.
+- **Map geography cleanup:** the legacy broad river wash is removed; the detailed river chooses a low-conflict route, unavoidable town crossings receive dry land, road/water crossings receive visible bridges, and roads use an earthy solid treatment instead of dashed network lines.
+- **Travel graph unchanged:** a tested threshold-road rewrite made campaigns more unresolved, so v1.4.8 keeps the proven v1.4.7 road topology and changes presentation only.
+- **Merge hardening:** onboarding progress now autosaves by stage, mid-tutorial and legacy v1 saves are recovery-tested, time/advanced tabs stay locked until onboarding ends, and the desktop Chromium + iPhone-sized WebKit PR check remains active for future changes.
+
+See `FIRST-HOUR-QA.md` for the feedback-to-change mapping and regression notes.
+
 ## v1.4.7 balance + simulation QA
 
 This release is a mechanics/AI quality pass built from repeated seeded campaign testing rather than a blanket difficulty increase.
