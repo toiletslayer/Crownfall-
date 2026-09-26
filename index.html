@@ -551,8 +551,8 @@ function renderAll(){renderHeader();if($('#map')?.querySelector('.settlement'))u
 function renderHeader(){
   $('#day').textContent=`Day ${world.day}`;$('#influence').textContent=`✦ ${Math.floor(world.factions[0].influence)} Influence`;$('#influence').title='Realm-wide currency. Annexation costs 35 Influence; Envoys cost 12.';$('#realm').textContent=`♜ ${owned().length}/${world.settlements.length} Settlements`;$('#phase').textContent=world.day<FOUNDING_TRUCE_DAYS?`☮ Truce ${FOUNDING_TRUCE_DAYS-world.day}d`:'⚔ Open conflict';
   const intro=onboardingActive();
-  $('.time button').forEach(b=>{b.classList.toggle('active',Number(b.dataset.speed)===speed);b.disabled=intro;});
-  $('.tab').forEach(b=>b.disabled=intro&&b.dataset.tab!=='settlement');
+  $$('.time button').forEach(b=>{b.classList.toggle('active',Number(b.dataset.speed)===speed);b.disabled=intro;});
+  $$('.tab').forEach(b=>b.disabled=intro&&b.dataset.tab!=='settlement');
   for(const id of ['load','newGame']){const b=$('#'+id);if(b){b.disabled=intro;b.title=intro?'Finish or skip the one-time First Hour before loading or starting another campaign.':'';}}
 }
 
@@ -682,8 +682,8 @@ function renderSettlement(){
   h+=battleLinks(s.id);
   $('#panel').innerHTML=h;
   wireMobileJumps();
-  $$('[data-build]').forEach(b=>b.onclick=()=>{const key=b.dataset.build,r=upgradeBuilding(world,selected,key);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===1&&key==='farms'){world.onboarding.stage=2;persistOnboardingProgress();}renderAll();showTutorial();});
-  $$('[data-recruit]').forEach(b=>b.onclick=()=>{const key=b.dataset.recruit,qty=Number(b.dataset.q),r=recruit(world,selected,key,qty);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===2&&key==='militia'&&qty>=5){world.onboarding.stage=3;persistOnboardingProgress();}renderAll();showTutorial();});
+  $$$('[data-build]').forEach(b=>b.onclick=()=>{const key=b.dataset.build,r=upgradeBuilding(world,selected,key);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===1&&key==='farms'){world.onboarding.stage=2;persistOnboardingProgress();}renderAll();showTutorial();});
+  $$$('[data-recruit]').forEach(b=>b.onclick=()=>{const key=b.dataset.recruit,qty=Number(b.dataset.q),r=recruit(world,selected,key,qty);status(r.msg);if(r.ok&&onboardingActive()&&onboardingStage()===2&&key==='militia'&&qty>=5){world.onboarding.stage=3;persistOnboardingProgress();}renderAll();showTutorial();});
   if(mine)wireArmyDraft(s);$('#sendArmy')?.addEventListener('click',sendFromPanel);$('#toDip')?.addEventListener('click',()=>{activeTab='diplomacy';renderPanel();});
   $$('[data-prepare]').forEach(b=>b.onclick=()=>prepareOrder(s.id,b.dataset.prepare));$$('[data-report]').forEach(b=>b.onclick=()=>showBattleReport(Number(b.dataset.report)));
 }
