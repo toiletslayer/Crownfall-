@@ -112,7 +112,7 @@ def desktop_journey(browser):
     page.locator("#u_militia").fill("5")
     for k in ["spears","raiders","cavalry"]:
         if page.locator(f"#u_{k}").count(): page.locator(f"#u_{k}").fill("0")
-    reports_before_reinforce=page.evaluate("window.__CROWNFALL__.getWorld().battleReports.length")
+    reports_before_reinforce=page.evaluate(f"window.__CROWNFALL__.getWorld().battleReports.filter(r=>r.settlementId==={ally_sid}&&r.attackerOwner===0).length")
     click(page,"#sendArmy");page.wait_for_timeout(100)
     army=page.evaluate("window.__CROWNFALL__.getWorld().armies.find(a=>a.owner===0&&a.mission==='reinforce')")
     reinforce_id=army["id"] if army else None
@@ -121,7 +121,7 @@ def desktop_journey(browser):
         page.evaluate(f"window.__CROWNFALL__.advance({delta})");page.wait_for_timeout(120)
     reinforce_event=page.evaluate("""() => window.__CROWNFALL__.getWorld().events.slice().reverse().find(e=>/Allied reinforcements reached/i.test(e.text||''))?.text || ''""")
     reinforce_gone=(page.evaluate(f"window.__CROWNFALL__.getWorld().armies.some(a=>a.id==={reinforce_id})") is False) if reinforce_id is not None else False
-    reinforce_no_battle=page.evaluate("window.__CROWNFALL__.getWorld().battleReports.length")==reports_before_reinforce
+    reinforce_no_battle=page.evaluate(f"window.__CROWNFALL__.getWorld().battleReports.filter(r=>r.settlementId==={ally_sid}&&r.attackerOwner===0).length")==reports_before_reinforce
     result["alliance"]={
       "envoyRelationGain":rel1-rel0,
       "envoyInfluenceSpent":inf0-inf1,
