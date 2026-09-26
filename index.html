@@ -313,7 +313,8 @@ function sendArmy(w,owner,fromId,toId,units,mission='raid'){
 function applyCasualties(units,ratio){const out={};for(const [k,n] of Object.entries(units))out[k]=Math.max(0,Math.floor(n*(1-ratio)));return out;}
 function unitLosses(before,after){const out={};for(const k of Object.keys(UNITS))out[k]=Math.max(0,(before[k]||0)-(after[k]||0));return out;}
 function addBattleReport(w,data){if(!Array.isArray(w.battleReports))w.battleReports=[];if(!Number.isInteger(w.nextReportId))w.nextReportId=1;const report={id:w.nextReportId++,...data};w.battleReports.push(report);if(w.battleReports.length>500)w.battleReports.splice(0,w.battleReports.length-500);return report;}
-function returnSurvivors(w,army,units){const s=w.settlements[army.from]; if(s&&s.owner===army.owner){for(const k of Object.keys(UNITS))s.troops[k]+=units[k]||0;} else {const owned=w.settlements.find(x=>x.owner===army.owner);if(owned)for(const k of Object.keys(UNITS))owned.troops[k]+=units[k]||0;}}
+function armyReturnSettlement(w,army){const s=w.settlements[army.from];return s&&s.owner===army.owner?s:w.settlements.find(x=>x.owner===army.owner)||null;}
+function returnSurvivors(w,army,units){const s=armyReturnSettlement(w,army);if(s)for(const k of Object.keys(UNITS))s.troops[k]+=units[k]||0;}
 function resolveArmy(w,a,rng){
  const target=w.settlements[a.target], attacker=w.factions[a.owner]; if(!target||!attacker.alive)return;
  if(target.owner===a.owner){for(const k of Object.keys(UNITS))target.troops[k]+=a.units[k]||0;w.events.push({day:w.day,type:'move',actors:[a.owner],settlement:target.id,text:`Reinforcements reached ${target.name}.`});return;}
@@ -330,8 +331,13 @@ function resolveArmy(w,a,rng){
  if(target.owner!==null){const rel=getRelation(w,a.owner,target.owner);setDiplomacy(w,a.owner,target.owner,'war',Math.min(rel,-35));}
  if(win){
    if(a.mission==='raid'){
-     const loot={};for(const k of RESOURCE_KEYS){loot[k]=Math.min(target.resources[k],Math.round(90+attack*0.025));target.resources[k]-=loot[k];}
-     report.loot=loot;report.outcome='Successful raid';const home=w.settlements[a.from];if(home&&home.owner===a.owner)for(const k of RESOURCE_KEYS)home.resources[k]+=loot[k];w.stats.raids++;w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} raided ${target.name} and carried off supplies.`});returnSurvivors(w,a,survivors);
+     const home=armyReturnSettlement(w,a),loot={};
+     for(const k of RESOURCE_KEYS){
+       const wanted=Math.min(target.resources[k],Math.round(90+attack*0.025));
+       const room=home?Math.max(0,storageCap(home)-home.resources[k]):0;
+       loot[k]=Math.min(wanted,room);target.resources[k]-=loot[k];if(home)home.resources[k]+=loot[k];
+     }
+     report.loot=loot;report.outcome='Successful raid';w.stats.raids++;w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} raided ${target.name} and carried off supplies.`});returnSurvivors(w,a,survivors);
    } else if(a.mission==='annex'){
      if(attacker.influence>=35 && armySize(survivors)>=6){const old=target.owner;attacker.influence-=35;target.owner=a.owner;target.capital=false;target.buildings.walls=Math.max(0,target.buildings.walls-1);target.troops=survivors;report.annexed=true;report.influenceSpent=35;report.outcome='Settlement annexed';w.stats.annexations++;w.events.push({day:w.day,type:'conquest',actors:[a.owner,old].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} annexed ${target.name}.`});if(old!==null)w.factions[old].influence=Math.max(0,w.factions[old].influence-12);}
      else {report.outcome='Battle won; annexation failed';w.events.push({day:w.day,type:'battle',actors:[a.owner,defenderOwner].filter(x=>x!==null),settlement:target.id,reportId:report.id,text:`${ownerName} won at ${target.name}, but lacked the influence to annex it.`});returnSurvivors(w,a,survivors);}
