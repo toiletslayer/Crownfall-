@@ -102,6 +102,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     page.goto(BASE,wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(1300)
+    if errors:
+        raise RuntimeError(name+": startup browser errors: "+" | ".join(errors))
     result={"profile":name,"viewport":viewport,"initial":world(page),"stages":{},"errors":errors}
 
     # Stage 0
