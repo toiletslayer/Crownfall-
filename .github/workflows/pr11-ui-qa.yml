@@ -5,12 +5,16 @@ on:
     paths:
       - index.html
       - qa/pr11_ui_qa.py
+      - qa/core_game_qa.mjs
+      - qa/full_game_qa.py
       - .github/workflows/pr11-ui-qa.yml
   push:
     branches: [main]
     paths:
       - index.html
       - qa/pr11_ui_qa.py
+      - qa/core_game_qa.mjs
+      - qa/full_game_qa.py
       - .github/workflows/pr11-ui-qa.yml
   workflow_dispatch:
 permissions:
@@ -35,14 +39,20 @@ jobs:
           python-version: '3.12'
       - run: pip install playwright
       - run: python -m playwright install --with-deps chromium webkit
+      - name: Run whole-game core QA
+        run: node qa/core_game_qa.mjs
       - name: Start static server
         run: |
           python -m http.server 8000 >/tmp/crownfall-http.log 2>&1 &
           sleep 2
-      - name: Run focused UI QA
+      - name: Run focused onboarding UI QA
         run: python qa/pr11_ui_qa.py
+      - name: Run whole-game browser QA
+        run: python qa/full_game_qa.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: crownfall-ui-qa
-          path: qa-output/
+          path: |
+            qa-output/
+            qa-output-full/
