@@ -506,6 +506,16 @@ function focusTutorialTarget(stage){
   let target=null,section=null;
   if(stage===1){target=$('[data-build="farms"]')?.closest('.building');section=$('.buildingsCard');}
   else if(stage===2){target=$('[data-recruit="militia"][data-q="5"]')?.closest('.unitRow');section=$('.garrisonCard');}
+  else if(stage===3&&window.matchMedia('(max-width:900px)').matches){
+    document.body.classList.remove('v14-panel-focus');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const capital=$('#map .settlement.playerRealm');
+      if(!capital)return;
+      const r=capital.getBoundingClientRect(),centerY=window.scrollY+r.top+r.height/2;
+      window.scrollTo({top:Math.max(0,centerY-window.innerHeight*.66),behavior:'auto'});
+    }));
+    return;
+  }
   else if(stage===4){target=$('.quickOrders');section=target;}
   if(!target||!section)return;
   target.classList.add('introFocus');
