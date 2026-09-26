@@ -102,13 +102,15 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
 
     # Stage 1: required Farms button should be usable, not covered.
     result["stages"]["1"]={"stage":stage(page),"farmsVisible":page.locator('[data-build="farms"]').first.is_visible(),
-      "farmsCovered":covered(page,'[data-build="farms"]'),"farmsInPanelView":in_panel_view(page,'[data-build="farms"]'),"effectText":page.locator('.building').filter(has_text="Farms").first.inner_text()}
+      "farmsCovered":covered(page,'[data-build="farms"]'),"farmsInPanelView":in_panel_view(page,'[data-build="farms"]'),
+      "buildShortcutVisible":page.locator('[data-mobile-jump="buildingsCard"]').is_visible() if is_mobile else True,"effectText":page.locator('.building').filter(has_text="Farms").first.inner_text()}
     snap(page,f"{name}-01-farms.png")
     click_real(page,'[data-build="farms"]')
 
     # Stage 2: recruit Militia.
     result["stages"]["2"]={"stage":stage(page),"militiaVisible":page.locator('[data-recruit="militia"][data-q="5"]').is_visible(),
       "militiaCovered":covered(page,'[data-recruit="militia"][data-q="5"]'),"militiaInPanelView":in_panel_view(page,'[data-recruit="militia"][data-q="5"]'),
+      "recruitShortcutVisible":page.locator('[data-mobile-jump="garrisonCard"]').is_visible() if is_mobile else True,
       "raidersVisible":page.locator('[data-recruit="raiders"]').count()>0 and page.locator('[data-recruit="raiders"]').first.is_visible(),
       "cavalryVisible":page.locator('[data-recruit="cavalry"]').count()>0 and page.locator('[data-recruit="cavalry"]').first.is_visible()}
     snap(page,f"{name}-02-militia.png")
@@ -124,7 +126,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
 
     # Stage 4 inspect/prepare.
     result["stages"]["4"]={"stage":stage(page),"raidVisible":page.locator('[data-prepare="raid"]').count()>0 and page.locator('[data-prepare="raid"]').first.is_visible(),
-      "raidCovered":covered(page,'[data-prepare="raid"]'),"raidInPanelView":in_panel_view(page,'[data-prepare="raid"]'),"panelText":visible_text(page)[:2500]}
+      "raidCovered":covered(page,'[data-prepare="raid"]'),"raidInPanelView":in_panel_view(page,'[data-prepare="raid"]'),
+      "actionsShortcutVisible":page.locator('[data-mobile-jump="quickOrders"]').is_visible() if is_mobile else True,"panelText":visible_text(page)[:2500]}
     snap(page,f"{name}-04-orders.png")
     click_real(page,'[data-prepare="raid"]')
 
@@ -140,6 +143,7 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     click_real(page,"#introFinish")
     page.wait_for_timeout(4300)
     result["finished"]={"world":world(page),"tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')"),
+      "normalSpeedActive":page.locator('.time [data-speed="0.25"]').evaluate("e=>e.classList.contains('active')"),
       "map":map_counts(page)}
     snap(page,f"{name}-06-running.png")
     if name.startswith("desktop"):
@@ -176,12 +180,13 @@ with sync_playwright() as p:
             hard.append(r["profile"]+": full map did not reveal 48 settlements")
         if not r["stages"]["0"].get("legendHidden"): hard.append(r["profile"]+": legend exposed during staged reveal")
         if not r["stages"]["0"].get("musicHidden"): hard.append(r["profile"]+": music button exposed during tutorial")
-        for key,label in [("farmsInPanelView","Farms"),("militiaInPanelView","Militia")]:
-            if not r["stages"][key=="farmsInPanelView" and "1" or "2"].get(key): hard.append(r["profile"]+f": {label} action not brought into visible panel")
-        if not r["stages"]["4"].get("raidInPanelView"): hard.append(r["profile"]+": Raid action not brought into visible panel")
+        if not r["stages"]["1"].get("buildShortcutVisible"): hard.append(r["profile"]+": Build shortcut unavailable during Farms lesson")
+        if not r["stages"]["2"].get("recruitShortcutVisible"): hard.append(r["profile"]+": Recruit shortcut unavailable during Militia lesson")
+        if not r["stages"]["4"].get("actionsShortcutVisible"): hard.append(r["profile"]+": Actions shortcut unavailable during order lesson")
+        if r["stages"]["0"].get("map",{}).get("bridges",0)!=0: hard.append(r["profile"]+": hidden roads leaked bridge geometry on Day 0")
         geo=r["stages"]["5"].get("river",{})
         if geo.get("uncoveredClose",0): hard.append(r["profile"]+": river still visually crosses an uncleared settlement")
         if geo.get("bridgeCount")!=geo.get("visualCrossings"): hard.append(r["profile"]+": bridge count does not match visual river crossings")
-        if r["finished"]["world"].get("day",0)<1: hard.append(r["profile"]+": Start the clock did not advance the day")
+        if not r["finished"].get("normalSpeedActive"): hard.append(r["profile"]+": Start the clock did not select normal speed")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
