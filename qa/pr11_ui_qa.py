@@ -100,14 +100,16 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     snap(page,f"{name}-00-day0.png")
     click_real(page,"#introNext")
 
-    # Stage 1: required Farms button should be usable, not covered.
+    # Stage 1: on mobile, use the same Build shortcut the tutorial tells the player to use.
+    if is_mobile: click_real(page,'[data-mobile-jump="buildingsCard"]')
     result["stages"]["1"]={"stage":stage(page),"farmsVisible":page.locator('[data-build="farms"]').first.is_visible(),
       "farmsCovered":covered(page,'[data-build="farms"]'),"farmsInPanelView":in_panel_view(page,'[data-build="farms"]'),
       "buildShortcutVisible":page.locator('[data-mobile-jump="buildingsCard"]').is_visible() if is_mobile else True,"effectText":page.locator('.building').filter(has_text="Farms").first.inner_text()}
     snap(page,f"{name}-01-farms.png")
     click_real(page,'[data-build="farms"]')
 
-    # Stage 2: recruit Militia.
+    # Stage 2: use Recruit on mobile, then verify Militia is actually in the panel viewport.
+    if is_mobile: click_real(page,'[data-mobile-jump="garrisonCard"]')
     result["stages"]["2"]={"stage":stage(page),"militiaVisible":page.locator('[data-recruit="militia"][data-q="5"]').is_visible(),
       "militiaCovered":covered(page,'[data-recruit="militia"][data-q="5"]'),"militiaInPanelView":in_panel_view(page,'[data-recruit="militia"][data-q="5"]'),
       "recruitShortcutVisible":page.locator('[data-mobile-jump="garrisonCard"]').is_visible() if is_mobile else True,
@@ -124,7 +126,8 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     snap(page,f"{name}-03-neighbors.png")
     if neutrals.count(): click_real(page,"#map .settlement.neutral")
 
-    # Stage 4 inspect/prepare.
+    # Stage 4: use Actions on mobile, then verify the contextual order buttons are in view.
+    if is_mobile: click_real(page,'[data-mobile-jump="quickOrders"]')
     result["stages"]["4"]={"stage":stage(page),"raidVisible":page.locator('[data-prepare="raid"]').count()>0 and page.locator('[data-prepare="raid"]').first.is_visible(),
       "raidCovered":covered(page,'[data-prepare="raid"]'),"raidInPanelView":in_panel_view(page,'[data-prepare="raid"]'),
       "actionsShortcutVisible":page.locator('[data-mobile-jump="quickOrders"]').is_visible() if is_mobile else True,"panelText":visible_text(page)[:2500]}
@@ -183,6 +186,10 @@ with sync_playwright() as p:
         if not r["stages"]["1"].get("buildShortcutVisible"): hard.append(r["profile"]+": Build shortcut unavailable during Farms lesson")
         if not r["stages"]["2"].get("recruitShortcutVisible"): hard.append(r["profile"]+": Recruit shortcut unavailable during Militia lesson")
         if not r["stages"]["4"].get("actionsShortcutVisible"): hard.append(r["profile"]+": Actions shortcut unavailable during order lesson")
+        if r["profile"].startswith("iphone"):
+            if not r["stages"]["1"].get("farmsInPanelView"): hard.append(r["profile"]+": Build shortcut did not bring Farms into view")
+            if not r["stages"]["2"].get("militiaInPanelView"): hard.append(r["profile"]+": Recruit shortcut did not bring Militia into view")
+            if not r["stages"]["4"].get("raidInPanelView"): hard.append(r["profile"]+": Actions shortcut did not bring Raid into view")
         if r["stages"]["0"].get("map",{}).get("bridges",0)!=0: hard.append(r["profile"]+": hidden roads leaked bridge geometry on Day 0")
         geo=r["stages"]["5"].get("river",{})
         if geo.get("uncoveredClose",0): hard.append(r["profile"]+": river still visually crosses an uncleared settlement")
