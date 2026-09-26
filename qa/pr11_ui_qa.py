@@ -194,6 +194,42 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     ctx.close()
     return result
 
+def returning_player_rollout_checks(browser):
+    ctx=browser.new_context(viewport={"width":1200,"height":820})
+    page=ctx.new_page()
+    page.goto(BASE,wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    # Simulate a v1.4.7 browser: old tutorial seen, but no v1.4.8 First Hour marker.
+    page.evaluate("""() => {
+      localStorage.setItem('crownfall-tutorial-seen','1');
+      localStorage.removeItem('crownfall-first-hour-complete');
+      localStorage.removeItem('crownfall-first-hour-v148-seen');
+    }""")
+    page.reload(wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(250)
+    shown_once={
+      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
+      "stage":stage(page),
+      "skipText":page.locator("#introSkip").inner_text() if page.locator("#introSkip").count() else ""
+    }
+    # Skipping counts as having seen v1.4.8 First Hour.
+    page.locator("#introSkip").click()
+    page.wait_for_timeout(180)
+    after_skip={
+      "marker":page.evaluate("localStorage.getItem('crownfall-first-hour-v148-seen')"),
+      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active")
+    }
+    page.reload(wait_until="networkidle")
+    page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
+    page.wait_for_timeout(220)
+    no_repeat={
+      "active":page.evaluate("!!window.__CROWNFALL__.getWorld().onboarding?.active"),
+      "tutorialHidden":page.locator("#tutorial").evaluate("e=>e.classList.contains('hidden')")
+    }
+    ctx.close()
+    return {"shownOnce":shown_once,"afterSkip":after_skip,"noRepeat":no_repeat}
+
 def persistence_checks(browser):
     ctx=browser.new_context(viewport={"width":1200,"height":820})
     page=ctx.new_page()
@@ -278,13 +314,14 @@ with sync_playwright() as p:
     desktop=p.chromium.launch(headless=True)
     allr.append(profile(desktop,"desktop-chromium",{"width":1440,"height":900}))
     persistence=persistence_checks(desktop)
+    rollout=returning_player_rollout_checks(desktop)
     desktop.close()
 
     mobile=p.webkit.launch(headless=True)
     allr.append(profile(mobile,"iphone-webkit",{"width":390,"height":844},True,True))
     mobile.close()
 
-    payload={"profiles":allr,"persistence":persistence}
+    payload={"profiles":allr,"persistence":persistence,"rollout":rollout}
     with open(OUT/"results.json","w") as fh: json.dump(payload,fh,indent=2)
     print(json.dumps(payload,indent=2))
     hard=[]
@@ -335,5 +372,13 @@ with sync_playwright() as p:
         hard.append("persistence: legacy v1 save compatibility failed")
     if persistence["normalized"]["active"] or persistence["normalized"]["stage"]!=6 or not persistence["normalized"]["tutorialHidden"]:
         hard.append("persistence: completed user can be trapped by stale active onboarding save")
+    if not rollout["shownOnce"]["active"] or rollout["shownOnce"]["stage"]!=0:
+        hard.append("rollout: v1.4.7 returning player did not receive v1.4.8 First Hour")
+    if "Skip" not in rollout["shownOnce"]["skipText"]:
+        hard.append("rollout: returning player was not offered a skip option")
+    if rollout["afterSkip"]["marker"]!="1" or rollout["afterSkip"]["active"]:
+        hard.append("rollout: skipping First Hour did not persist v1.4.8 completion")
+    if rollout["noRepeat"]["active"] or not rollout["noRepeat"]["tutorialHidden"]:
+        hard.append("rollout: v1.4.8 First Hour repeated after being skipped once")
     if hard:
         raise SystemExit("HARD QA FAILURES\n" + "\n".join(hard))
