@@ -12,6 +12,8 @@ for n,line in enumerate(source.splitlines(),1):
         bad_selector_lists.append((n,line.strip()))
 if bad_selector_lists:
     raise SystemExit("Single-element selector used with .forEach(): "+repr(bad_selector_lists))
+if "$$(" in source:
+    raise SystemExit("Accidental triple-dollar selector found in index.html")
 
 def box(page,sel):
     loc=page.locator(sel)
