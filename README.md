@@ -22,6 +22,7 @@ This branch addresses fresh-player feedback before adding more combat systems.
 - **Exact upgrade effects:** building cards show before/after production, supply, storage, defense multiplier, Influence generation, or troop unlocks before spending.
 - **Map geography cleanup:** the legacy broad river wash is removed; the detailed river chooses a low-conflict route, unavoidable town crossings receive dry land, road/water crossings receive visible bridges, and roads use an earthy solid treatment instead of dashed network lines.
 - **Travel graph unchanged:** a tested threshold-road rewrite made campaigns more unresolved, so v1.4.8 keeps the proven v1.4.7 road topology and changes presentation only.
+- **Merge hardening:** onboarding progress now autosaves by stage, mid-tutorial and legacy v1 saves are recovery-tested, time/advanced tabs stay locked until onboarding ends, and the desktop Chromium + iPhone-sized WebKit PR check remains active for future changes.
 
 See `FIRST-HOUR-QA.md` for the feedback-to-change mapping and regression notes.
 
