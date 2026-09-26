@@ -26,6 +26,7 @@ def desktop_journey(browser):
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(500)
     skip_intro(page)
+    if page.locator('.time [data-speed="0"]').count(): page.locator('.time [data-speed="0"]').click()
     result={"errors":errors}
 
     # Baseline UI / full map / help / music.
@@ -85,8 +86,18 @@ def desktop_journey(browser):
         ally_btn.click();page.wait_for_timeout(100)
     alliance=page.evaluate("window.__CROWNFALL__.getWorld().relations['0:1'].status")
 
-    ally_sid=page.evaluate("window.__CROWNFALL__.getWorld().settlements.find(s=>s.owner===1).id")
-    page.locator(f'#map .settlement[data-id="{ally_sid}"]').click();page.wait_for_timeout(100)
+    ally_sid=page.evaluate("""() => {
+      const w=window.__CROWNFALL__.getWorld();
+      for(const el of document.querySelectorAll('#map .settlement')){
+        const id=Number(el.dataset.id);
+        if(w.settlements[id]?.owner===1)return id;
+      }
+      return null;
+    }""")
+    rendered_before_ally=page.locator("#map .settlement").count()
+    if ally_sid is None:
+        raise RuntimeError("No rendered House Vale settlement after alliance; rendered="+str(rendered_before_ally))
+    page.locator(f'#map .settlement[data-id="{ally_sid}"]').click(timeout=5000);page.wait_for_timeout(100)
     allied_support="Allied Support" in page.locator("#panel").inner_text()
     hostile_on_ally=page.locator('[data-prepare="raid"],[data-prepare="annex"],[data-prepare="attack"]').count()
     reinf=page.locator('[data-prepare="reinforce"]')
@@ -112,6 +123,7 @@ def desktop_journey(browser):
       "envoyRelationGain":rel1-rel0,
       "envoyInfluenceSpent":inf0-inf1,
       "status":alliance,
+      "renderedSettlements":rendered_before_ally,
       "alliedSupport":allied_support,
       "hostileButtonsOnAlly":hostile_on_ally,
       "missionText":mission_text,
@@ -228,6 +240,7 @@ def mobile_journey(browser):
     page.goto(BASE,wait_until="networkidle")
     page.wait_for_function("window.__CROWNFALL__ && window.__CROWNFALL__.getWorld()")
     page.wait_for_timeout(500);skip_intro(page);page.wait_for_timeout(350)
+    if page.locator('.time [data-speed="0"]').count(): page.locator('.time [data-speed="0"]').click()
     result={"errors":errors}
 
     nav=page.locator(".mobileSettlementNav")
