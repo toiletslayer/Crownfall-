@@ -20,7 +20,7 @@ First-time flow is now staged:
 7. Ask the player to prepare a Raid / Attack / Annex order.
 8. Reveal the full Marches and let the player start the clock.
 
-The tutorial can be skipped. Returning players who already completed the prior tutorial are not forced through the new first-hour sequence.
+The tutorial can be skipped immediately. Returning v1.4.7 players who only have the older tutorial marker are shown the v1.4.8 First Hour once. Completing or skipping it writes a v1.4.8-specific marker so it is not forced again.
 
 ### “The game may be spending things before I understand them.”
 
@@ -126,6 +126,7 @@ Because the UX complaint can be addressed visually without disturbing travel bal
 - Legacy version-1 saves without an `onboarding` field still load with tutorial chrome hidden.
 - A completed user cannot be trapped by an older active-onboarding save; it normalizes to completed Stage 6.
 - “Start the clock” selects normal speed and reaches Day 1 in both browser profiles.
+- Load/New Game are locked while the one-time First Hour is active, preventing an old save from bypassing the rollout; skipping or completing the First Hour unlocks them immediately.
 - Bridge count matches actual curved-river road crossings in the browser sample, with zero uncovered close settlements.
 - No Siege Crew or siege mechanic is included.
 - No road-topology change is included.
@@ -148,7 +149,7 @@ The focused merge-risk pass found and fixed issues that the initial visual QA di
 
 ## Known residuals / intentional behavior
 
-- Returning players who already have the older `crownfall-tutorial-seen` flag are **not forced** through the new first-hour flow. For retesting the onboarding itself, use a fresh/private browser session or clear Crownfall site data.
+- Returning v1.4.7 players who only have the older `crownfall-tutorial-seen` flag are shown the v1.4.8 First Hour once. They may choose **Skip First Hour** immediately; once completed or skipped, it does not repeat.
 - This QA uses iPhone-sized WebKit rather than a physical iPhone. A real-device spot check is still worthwhile after deployment, but there is no current browser-QA blocker.
 - The river scorer can still place up to three settlements close to the river in rare generated worlds; dry-ground treatment prevents water from visibly running underneath those towns.
 - Barracks IV–VI still have no new troop unlock or documented mechanical benefit. That is pre-existing game-design debt, not introduced by this PR.
