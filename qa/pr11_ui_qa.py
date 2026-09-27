@@ -164,9 +164,15 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     tappable=tappable_indices(page,"#map .settlement.neutral")
     tap_i=tappable[0] if tappable else -1
     visible_neutral_labels=page.locator("#map .label-neutral").evaluate_all("els=>els.filter(e=>getComputedStyle(e).display!=='none').length")
+    label_overlap_count=page.evaluate("""() => {
+      const t=document.querySelector('#tutorial')?.getBoundingClientRect();if(!t)return 99;
+      const overlap=(a,b)=>!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top);
+      return [...document.querySelectorAll('#map .label-neutral')].filter(e=>getComputedStyle(e).display!=='none'&&overlap(t,e.getBoundingClientRect())).length;
+    }""")
     tutorial_box=box(page,"#tutorial")
     result["stages"]["3"]={"stage":stage(page),"map":map_counts(page),"neutralCount":neutrals.count(),
       "tappableNeutralIndex":tap_i,"tappableNeutralCount":len(tappable),"visibleNeutralLabels":visible_neutral_labels,
+      "neutralLabelOverlapCount":label_overlap_count,
       "tutorialBox":tutorial_box,
       "tutorialViewportWidthRatio":(tutorial_box["width"]/viewport["width"]) if tutorial_box else 1,
       "tutorialViewportHeightRatio":(tutorial_box["height"]/viewport["height"]) if tutorial_box else 1,
@@ -397,7 +403,8 @@ with sync_playwright() as p:
         if r["stages"]["3"].get("tappableNeutralIndex",-1) < 0: hard.append(r["profile"]+": no tappable Independent neighbor during local reveal")
         if r["profile"].startswith("iphone"):
             if r["stages"]["3"].get("visibleNeutralLabels",0) < 2: hard.append(r["profile"]+": too few Independent neighbor labels visible during tutorial")
-            if r["stages"]["3"].get("tappableNeutralCount",0) < 2: hard.append(r["profile"]+": Neighbors coach leaves fewer than two Independents tappable")
+            if r["stages"]["3"].get("tappableNeutralCount",0) != r["stages"]["3"].get("neutralCount",0): hard.append(r["profile"]+": Neighbors coach obstructs at least one Independent settlement")
+            if r["stages"]["3"].get("neutralLabelOverlapCount",99) != 0: hard.append(r["profile"]+": Neighbors coach obscures an Independent label")
             if not r["stages"]["3"].get("mapCoach"): hard.append(r["profile"]+": Neighbors lesson did not switch to compact map coach")
             if r["stages"]["3"].get("tutorialViewportWidthRatio",1) > .62: hard.append(r["profile"]+": Neighbors coach is too wide on iPhone")
             if r["stages"]["3"].get("tutorialViewportHeightRatio",1) > .30: hard.append(r["profile"]+": Neighbors coach is too tall on iPhone")
