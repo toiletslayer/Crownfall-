@@ -30,15 +30,19 @@ def covered(page,sel):
     b=box(page,sel); t=box(page,"#tutorial")
     return intersects(b,t)
 
-def tappable_index(page,sel):
-    loc=page.locator(sel); t=box(page,"#tutorial"); vp=page.viewport_size
+def tappable_indices(page,sel):
+    loc=page.locator(sel); t=box(page,"#tutorial"); vp=page.viewport_size; out=[]
     for i in range(loc.count()):
         b=loc.nth(i).bounding_box()
         if not b: continue
         if b["y"] < 0 or b["y"]+b["height"] > vp["height"]: continue
         if b["x"] < 0 or b["x"]+b["width"] > vp["width"]: continue
-        if not intersects(b,t): return i
-    return -1
+        if not intersects(b,t): out.append(i)
+    return out
+
+def tappable_index(page,sel):
+    xs=tappable_indices(page,sel)
+    return xs[0] if xs else -1
 
 def in_panel_view(page,sel):
     b=box(page,sel); p=box(page,"#panel")
@@ -157,10 +161,16 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     # Stage 3 local reveal: at least one labeled Independent must be actually tappable.
     page.wait_for_timeout(450)
     neutrals=page.locator("#map .settlement.neutral")
-    tap_i=tappable_index(page,"#map .settlement.neutral")
+    tappable=tappable_indices(page,"#map .settlement.neutral")
+    tap_i=tappable[0] if tappable else -1
     visible_neutral_labels=page.locator("#map .label-neutral").evaluate_all("els=>els.filter(e=>getComputedStyle(e).display!=='none').length")
+    tutorial_box=box(page,"#tutorial")
     result["stages"]["3"]={"stage":stage(page),"map":map_counts(page),"neutralCount":neutrals.count(),
-      "tappableNeutralIndex":tap_i,"visibleNeutralLabels":visible_neutral_labels}
+      "tappableNeutralIndex":tap_i,"tappableNeutralCount":len(tappable),"visibleNeutralLabels":visible_neutral_labels,
+      "tutorialBox":tutorial_box,
+      "tutorialViewportWidthRatio":(tutorial_box["width"]/viewport["width"]) if tutorial_box else 1,
+      "tutorialViewportHeightRatio":(tutorial_box["height"]/viewport["height"]) if tutorial_box else 1,
+      "mapCoach":page.locator("#tutorial").evaluate("e=>e.classList.contains('mapCoach')")}
     snap(page,f"{name}-03-neighbors.png")
     if tap_i < 0: raise RuntimeError(name+": no Independent neighbor is tappable without tutorial overlap")
     neutrals.nth(tap_i).click(timeout=3000); page.wait_for_timeout(220)
@@ -386,7 +396,11 @@ with sync_playwright() as p:
         if not r["stages"]["4"].get("actionsShortcutVisible"): hard.append(r["profile"]+": Actions shortcut unavailable during order lesson")
         if r["stages"]["3"].get("tappableNeutralIndex",-1) < 0: hard.append(r["profile"]+": no tappable Independent neighbor during local reveal")
         if r["profile"].startswith("iphone"):
-            if r["stages"]["3"].get("visibleNeutralLabels",0) < 1: hard.append(r["profile"]+": Independent neighbor labels hidden during tutorial")
+            if r["stages"]["3"].get("visibleNeutralLabels",0) < 2: hard.append(r["profile"]+": too few Independent neighbor labels visible during tutorial")
+            if r["stages"]["3"].get("tappableNeutralCount",0) < 2: hard.append(r["profile"]+": Neighbors coach leaves fewer than two Independents tappable")
+            if not r["stages"]["3"].get("mapCoach"): hard.append(r["profile"]+": Neighbors lesson did not switch to compact map coach")
+            if r["stages"]["3"].get("tutorialViewportWidthRatio",1) > .62: hard.append(r["profile"]+": Neighbors coach is too wide on iPhone")
+            if r["stages"]["3"].get("tutorialViewportHeightRatio",1) > .30: hard.append(r["profile"]+": Neighbors coach is too tall on iPhone")
             if not r["stages"]["1"].get("farmsInPanelView"): hard.append(r["profile"]+": Build shortcut did not bring Farms into view")
             if not r["stages"]["2"].get("militiaInPanelView"): hard.append(r["profile"]+": Recruit shortcut did not bring Militia into view")
             if not r["stages"]["4"].get("raidInPanelView"): hard.append(r["profile"]+": Actions shortcut did not bring Raid into view")
