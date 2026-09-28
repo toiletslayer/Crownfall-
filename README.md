@@ -4,7 +4,7 @@ A single-player browser strategy game about building one settlement into a regio
 
 ## Play
 
-**Live build:** https://toiletslayer.github.io/Crownfall-/?v=150
+**Live build:** https://toiletslayer.github.io/Crownfall-/?v=151
 
 The GitHub Pages build is the recommended version on phones and tablets. It runs entirely in the browser with no paid APIs, accounts, or game server.
 
