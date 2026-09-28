@@ -143,11 +143,11 @@ button,select,input{-webkit-tap-highlight-color:transparent;touch-action:manipul
   footer button{flex:0 0 auto;min-height:40px;padding:6px 8px;font-size:10px}
   #status{display:none}
   .tutorial{position:fixed;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;max-width:none;max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:14px;font-size:13px}
-  .tutorial.mapCoach{top:calc(max(8px,env(safe-area-inset-top)) + 82px);left:8px;right:auto;width:min(52vw,230px);max-height:none;overflow:visible;padding:10px 11px;font-size:11px;line-height:1.24;box-shadow:0 5px 18px #0008}
-  .tutorial.mapCoach .introKicker{font-size:8px;margin-bottom:3px}
-  .tutorial.mapCoach .introActions{margin-top:7px}
-  .tutorial.mapCoach .introActions button{font-size:10px;padding:6px 8px}
-  .tutorial.mapCoach b{font-size:12px}
+  .tutorial.mapCoach{top:110px;left:8px;right:auto;width:min(44vw,180px);max-width:180px;max-height:none;overflow:visible;padding:8px 9px;font-size:10px;line-height:1.18;box-shadow:0 4px 14px #0008;background:#f0e4c2f2;pointer-events:none}
+  .tutorial.mapCoach .introKicker{font-size:7px;margin-bottom:2px}
+  .tutorial.mapCoach .introActions{margin-top:6px}
+  .tutorial.mapCoach .introActions button{font-size:9px;padding:5px 7px;pointer-events:auto}
+  .tutorial.mapCoach b{font-size:11px}
   .modal{padding:8px;padding-top:calc(8px + env(safe-area-inset-top));padding-bottom:calc(8px + env(safe-area-inset-bottom));align-items:flex-end}
   .modalCard{width:100%;max-width:none;max-height:88dvh;border-radius:12px 12px 7px 7px;padding:18px 14px 14px}
   .close{min-width:44px;min-height:44px;font-size:22px;padding:0}
@@ -586,6 +586,32 @@ function bootGame(){
   if(raw)try{applySerializedWorld(raw,0);status(__persistentStorage?'Campaign resumed from autosave. Time is paused.':'Session campaign resumed. Time is paused.');return;}catch(e){}
   start('alder-crown-1');
 }
+function positionMapCoach(){
+  const t=$('#tutorial'),wrap=$('#mapWrap');
+  if(!t||!wrap||!onboardingActive()||onboardingStage()!==3||!window.matchMedia('(max-width:900px)').matches)return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const mr=wrap.getBoundingClientRect(),tr=t.getBoundingClientRect(),gap=8;
+    const targets=[...document.querySelectorAll('#map .settlement,#map .label')].filter(el=>getComputedStyle(el).display!=='none').map(el=>el.getBoundingClientRect());
+    const overlap=(a,b)=>Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));
+    const candidates=[
+      {left:mr.left+gap,top:mr.top+gap},
+      {left:mr.right-tr.width-gap,top:mr.top+gap},
+      {left:mr.left+gap,top:mr.bottom-tr.height-gap},
+      {left:mr.right-tr.width-gap,top:mr.bottom-tr.height-gap}
+    ].map(c=>({left:Math.max(gap,Math.min(window.innerWidth-tr.width-gap,c.left)),top:Math.max(gap,Math.min(window.innerHeight-tr.height-gap,c.top))}));
+    let best=candidates[0],bestScore=Infinity;
+    for(const c of candidates){
+      const box={left:c.left,top:c.top,right:c.left+tr.width,bottom:c.top+tr.height};
+      let score=0;for(const r of targets)score+=overlap(box,r);
+      if(score<bestScore){bestScore=score;best=c;}
+    }
+    t.style.left=Math.round(best.left)+'px';t.style.top=Math.round(best.top)+'px';t.style.right='auto';
+  }));
+}
+function clearMapCoachPosition(){
+  const t=$('#tutorial');if(!t)return;
+  t.style.removeProperty('left');t.style.removeProperty('top');t.style.removeProperty('right');
+}
 function focusTutorialTarget(stage){
   const panel=$('#panel');if(!panel)return;
   panel.querySelectorAll('.introFocus').forEach(el=>el.classList.remove('introFocus'));
@@ -594,12 +620,7 @@ function focusTutorialTarget(stage){
   else if(stage===2){target=$('[data-recruit="militia"][data-q="5"]')?.closest('.unitRow');section=$('.garrisonCard');}
   else if(stage===3&&window.matchMedia('(max-width:900px)').matches){
     document.body.classList.remove('v14-panel-focus');
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      const capital=$('#map .settlement.playerRealm');
-      if(!capital)return;
-      const r=capital.getBoundingClientRect(),centerY=window.scrollY+r.top+r.height/2;
-      window.scrollTo({top:Math.max(0,centerY-window.innerHeight*.66),behavior:'auto'});
-    }));
+    positionMapCoach();
     return;
   }
   else if(stage===4){target=$('.quickOrders');section=target;}
@@ -615,13 +636,13 @@ function focusTutorialTarget(stage){
 }
 function showTutorial(){
   const t=$('#tutorial');
-  if(!onboardingActive()){t.classList.add('hidden');t.classList.remove('mapCoach');return;}
+  if(!onboardingActive()){t.classList.add('hidden');t.classList.remove('mapCoach');clearMapCoachPosition();return;}
   const stage=onboardingStage(),cap=world.settlements.find(s=>s.owner===0);
-  t.classList.remove('hidden');t.classList.toggle('mapCoach',stage===3);
+  t.classList.remove('hidden');t.classList.toggle('mapCoach',stage===3);if(stage!==3)clearMapCoachPosition();
   if(stage===0)t.innerHTML=`<div class="introKicker">FIRST HOUR · DAY 0</div><b>This is your capital.</b><br><br>Crownfall starts paused. Nothing is spending resources and the rest of the Marches is hidden for a moment. Your three local resources are <b>Food</b>, <b>Wood</b>, and <b>Iron</b>. <b>Influence</b> is separate realm currency used for annexation and diplomacy.<div class="introGoal">First: look over ${cap?.name||'your settlement'}.</div><div class="introActions"><button id="introSkip">Skip First Hour</button><button id="introNext">Show me what to build</button></div>`;
   else if(stage===1)t.innerHTML=`<div class="introKicker">FIRST HOUR · ECONOMY</div><b>Make one deliberate upgrade.</b><br><br>Upgrade <b>Farms</b> once. On mobile, tap <b>Build</b> to jump straight to your buildings; on desktop, scroll the settlement panel if needed. The card shows the exact before/after effect and exact resource cost.<div class="introGoal">Goal: Farms II → III</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
   else if(stage===2)t.innerHTML=`<div class="introKicker">FIRST HOUR · GARRISON</div><b>Now recruit your first troops.</b><br><br>Recruit <b>5 Militia</b>. On mobile, tap <b>Recruit</b> to jump straight to the garrison. Raiders and Cavalry are temporarily hidden so you can learn the basic controls without a wall of unit choices.<div class="introGoal">Goal: Recruit 5 Militia</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
-  else if(stage===3)t.innerHTML=`<div class="introKicker">FIRST HOUR · NEIGHBORS</div><b>Tap a labeled Independent.</b><div style="margin-top:5px">Inspect its Keep, Walls, and defenses. Time is paused.</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
+  else if(stage===3)t.innerHTML=`<div class="introKicker">FIRST HOUR · NEIGHBORS</div><b>Tap any labeled Independent.</b><div style="margin-top:4px">The tip stays out of the way. Time is paused.</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
   else if(stage===4)t.innerHTML=`<div class="introKicker">FIRST HOUR · ORDERS</div><b>This is a potential target.</b><br><br>Use one of the large <b>Raid / Attack / Annex</b> buttons in the target panel. On mobile, tap <b>Actions</b> to jump straight to them. This only prepares an order—it does not send troops yet. Raid steals resources; Annex costs <b>35 Influence</b> and requires at least <b>6 surviving troops</b> after a victory.<div class="introGoal">Goal: Prepare an order against this neighbor</div><div class="introActions"><button id="introSkip">Skip First Hour</button></div>`;
   else {const returning=!!firstHourReturnRaw;t.innerHTML=`<div class="introKicker">FIRST HOUR · THE MARCHES</div><b>Now you can see the whole campaign.</b><br><br>You know the basic loop: develop your settlement, recruit troops, inspect a neighbor, and prepare an army order. Your Realm Steward is still <b>OFF</b>, so it cannot spend anything behind your back. Turn it on later from the Realm tab when you want automation.<div class="introGoal">The Founding Truce protects sovereign realms until day ${FOUNDING_TRUCE_DAYS}.</div><div class="introActions"><button id="introSkip">${returning?'Return paused':'Keep paused'}</button><button id="introFinish">${returning?'Return to campaign':'Start the clock'}</button></div>`;}
   $('#introSkip')?.addEventListener('click',stage>=5?()=>finalizeFirstHour({startClock:false,skipped:false}):skipFirstHour);
