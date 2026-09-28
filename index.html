@@ -1143,10 +1143,10 @@ bootGame();requestAnimationFrame(loop);
     '.v14-stone{fill:#b6ab8e;stroke:#4a4235;stroke-width:.8}.v14-stone-dark{fill:#8f8977;stroke:#443d32;stroke-width:.8}.v14-timber{fill:#866144;stroke:#3c291c;stroke-width:.75}.v14-plaster{fill:#c7bea1;stroke:#4a4031;stroke-width:.72}'+
     '.v14-roof{fill:#69463a;stroke:#34251f;stroke-width:.78}.v14-roof2{fill:#62584a;stroke:#302a24;stroke-width:.78}.v14-window{fill:#e8ca78;stroke:#5c4827;stroke-width:.28}'+
     '.v14-tree-trunk{fill:#5f4831}.v14-tree-a{fill:#29482d;stroke:#182d1c;stroke-width:.45}.v14-tree-b{fill:#345436;stroke:#1c321f;stroke-width:.45}.v14-rock{fill:#847e6c;stroke:#4a473e;stroke-width:.55}'+
-    '.v14-wall{fill:#aaa18a;stroke:#4a4335;stroke-width:.7}.v14-banner-pole{stroke:#403020;stroke-width:.75}.v14-banner{fill:var(--realm);stroke:#2a2118;stroke-width:.45}'+
+    '.v14-wall{fill:#aaa18a;stroke:#4a4335;stroke-width:.7}.v14-banner-pole{stroke:#403020;stroke-width:.75}.v14-banner{fill:var(--realm);stroke:#2a2118;stroke-width:.45}.v14-owner-ring{fill:#182016d9;stroke:var(--realm);stroke-width:2.2}'+
     '.label{font-size:10px!important;transform:translate(-50%,24px)!important;text-shadow:0 1px 3px #000,0 0 4px #000!important}'+
-    '@media(max-width:900px){.settlement{width:58px!important;height:57px!important}.settlement .settlementArt{width:58px!important;height:57px!important}.label{font-size:7.5px!important;max-width:76px!important;transform:translate(-50%,24px)!important}}'+
-    '@media(max-width:390px){.settlement{width:54px!important;height:53px!important}.settlement .settlementArt{width:54px!important;height:53px!important}}';
+    '@media(max-width:900px){.settlement{width:40px!important;height:40px!important}.settlement .settlementArt{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:30px!important;height:30px!important}.settlement.capital .settlementArt{width:36px!important;height:36px!important}.settlement.selected .settlementArt{width:34px!important;height:34px!important}.settlement.capital.selected .settlementArt{width:38px!important;height:38px!important}.settlement.capital::after{top:-7px!important;font-size:12px!important}.label{font-size:7.5px!important;max-width:76px!important;transform:translate(-50%,18px)!important}.capitalLabel{transform:translate(-50%,21px)!important}}'+
+    '@media(max-width:390px){.settlement{width:38px!important;height:38px!important}.settlement .settlementArt{width:28px!important;height:28px!important}.settlement.capital .settlementArt{width:34px!important;height:34px!important}.settlement.selected .settlementArt{width:32px!important;height:32px!important}.settlement.capital.selected .settlementArt{width:36px!important;height:36px!important}}';
   document.head.appendChild(style);
 
   function hashSeed(input){
@@ -1164,6 +1164,21 @@ bootGame();requestAnimationFrame(loop);
   }
   function house(x,y,w,h,alt){
     return '<g><rect class="v14-plaster" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx=".7"/><path class="'+(alt?'v14-roof2':'v14-roof')+'" d="M '+(x-1)+' '+y+' L '+(x+w/2)+' '+(y-h*.55)+' L '+(x+w+1)+' '+y+' Z"/><rect class="v14-timber" x="'+(x+w*.42)+'" y="'+(y+h*.52)+'" width="'+Math.max(1,w*.18)+'" height="'+(h*.48)+'"/><rect class="v14-window" x="'+(x+w*.17)+'" y="'+(y+h*.3)+'" width="'+Math.max(.8,w*.14)+'" height="'+Math.max(.8,h*.17)+'"/></g>';
+  }
+
+  function compactVillage(st,color){
+    const b=st.buildings||{},keep=Math.max(1,b.keep||1),walls=b.walls||0;
+    const towerH=15+Math.min(5,keep),towerY=27-towerH;
+    let h='<svg class="settlementArt v14Village v14VillageCompact" viewBox="0 0 42 42" aria-hidden="true" style="--realm:'+color+'">';
+    h+='<ellipse class="v14-owner-ring" cx="21" cy="23" rx="16" ry="13"/>';
+    if(walls>=1)h+='<path class="v14-wall" style="fill:none" stroke-width="'+(walls>=4?'2.4':'1.7')+'" d="M8 27 Q8 10 21 7 Q34 10 34 27"/>';
+    h+='<rect class="v14-stone" x="14" y="'+towerY+'" width="14" height="'+towerH+'" rx="1"/>';
+    h+='<path class="v14-roof2" d="M12 '+towerY+' L21 '+(towerY-7)+' L30 '+towerY+' Z"/>';
+    h+='<rect class="v14-stone-dark" x="19" y="'+(towerY+towerH-6)+'" width="4" height="6"/>';
+    h+='<rect class="v14-window" x="16.5" y="'+(towerY+5)+'" width="2.3" height="2.5"/><rect class="v14-window" x="23.2" y="'+(towerY+5)+'" width="2.3" height="2.5"/>';
+    h+='<path class="v14-banner-pole" d="M21 '+(towerY-7)+' V'+(towerY+2)+'"/><path class="v14-banner" d="M21 '+(towerY-6)+' h8 l-2.2 3 h-5.8z"/>';
+    h+='<ellipse cx="21" cy="35" rx="12" ry="2.6" fill="#11170f" opacity=".42"/>';
+    return h+'</svg>';
   }
 
   function village(st,color){
@@ -1212,11 +1227,12 @@ bootGame();requestAnimationFrame(loop);
     document.querySelectorAll('#map .settlement').forEach(function(el){
       const id=Number(el.dataset.id),st=w.settlements && w.settlements[id];
       if(!st)return;
-      const sig=[st.owner,st.capital].concat(Object.values(st.buildings||{})).join(':');
+      const compact=window.matchMedia('(max-width:900px)').matches;
+      const sig=[compact?'compact':'full',st.owner,st.capital].concat(Object.values(st.buildings||{})).join(':');
       if(el.dataset.v14Village===sig)return;
       el.dataset.v14Village=sig;
       const color=st.owner==null?'#aaa58d':((w.factions[st.owner]&&w.factions[st.owner].color)||'#aaa58d');
-      el.innerHTML=village(st,color);
+      el.innerHTML=compact?compactVillage(st,color):village(st,color);
     });
   }
 
