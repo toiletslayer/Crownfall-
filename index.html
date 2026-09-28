@@ -1171,7 +1171,7 @@ bootGame();requestAnimationFrame(loop);
     const towerH=15+Math.min(5,keep),towerY=27-towerH;
     let h='<svg class="settlementArt v14Village v14VillageCompact" viewBox="0 0 42 42" aria-hidden="true" style="--realm:'+color+'">';
     h+='<ellipse class="v14-owner-ring" cx="21" cy="23" rx="16" ry="13"/>';
-    if(walls>=1)h+='<path class="v14-wall" fill="none" stroke-width="'+(walls>=4?'2.4':'1.7')+'" d="M8 27 Q8 10 21 7 Q34 10 34 27"/>';
+    if(walls>=1)h+='<path class="v14-wall" style="fill:none" stroke-width="'+(walls>=4?'2.4':'1.7')+'" d="M8 27 Q8 10 21 7 Q34 10 34 27"/>';
     h+='<rect class="v14-stone" x="14" y="'+towerY+'" width="14" height="'+towerH+'" rx="1"/>';
     h+='<path class="v14-roof2" d="M12 '+towerY+' L21 '+(towerY-7)+' L30 '+towerY+' Z"/>';
     h+='<rect class="v14-stone-dark" x="19" y="'+(towerY+towerH-6)+'" width="4" height="6"/>';
