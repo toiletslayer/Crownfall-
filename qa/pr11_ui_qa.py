@@ -192,9 +192,25 @@ def profile(browser,name,viewport,is_mobile=False,has_touch=False):
     # Stage 5 full reveal.
     page.wait_for_timeout(1300)
     panel=visible_text(page)
+    density=page.evaluate("""() => {
+      const settlements=[...document.querySelectorAll('#map .settlement')];
+      const arts=[...document.querySelectorAll('#map .settlement .settlementArt')];
+      const artBoxes=arts.map(e=>e.getBoundingClientRect());
+      const hitBoxes=settlements.map(e=>e.getBoundingClientRect());
+      const visibleLabels=[...document.querySelectorAll('#map .label')].filter(e=>getComputedStyle(e).display!=='none');
+      return {
+        settlementCount:settlements.length,
+        compactCount:arts.filter(e=>e.classList.contains('v14VillageCompact')).length,
+        maxArtWidth:artBoxes.length?Math.max(...artBoxes.map(b=>b.width)):0,
+        maxArtHeight:artBoxes.length?Math.max(...artBoxes.map(b=>b.height)):0,
+        minHitWidth:hitBoxes.length?Math.min(...hitBoxes.map(b=>b.width)):0,
+        minHitHeight:hitBoxes.length?Math.min(...hitBoxes.map(b=>b.height)):0,
+        visibleLabelCount:visibleLabels.length
+      };
+    }""") if is_mobile else {}
     result["stages"]["5"]={"stage":stage(page),"map":map_counts(page),
       "resourceLabels":{k:(k in panel) for k in ["Food","Wood","Iron","Influence"]},
-      "river":river_audit(page),"tutorial":page.locator("#tutorial").inner_text()}
+      "river":river_audit(page),"tutorial":page.locator("#tutorial").inner_text(),"mobileDensity":density}
     snap(page,f"{name}-05-full-map.png")
 
     # Finish/start clock, confirm tutorial disappears and Day 1 is actually reached.
@@ -408,6 +424,11 @@ with sync_playwright() as p:
             if not r["stages"]["3"].get("mapCoach"): hard.append(r["profile"]+": Neighbors lesson did not switch to compact map coach")
             if r["stages"]["3"].get("tutorialViewportWidthRatio",1) > .62: hard.append(r["profile"]+": Neighbors coach is too wide on iPhone")
             if r["stages"]["3"].get("tutorialViewportHeightRatio",1) > .30: hard.append(r["profile"]+": Neighbors coach is too tall on iPhone")
+            density=r["stages"]["5"].get("mobileDensity",{})
+            if density.get("compactCount",0) != density.get("settlementCount",0): hard.append(r["profile"]+": full map did not use compact mobile settlement markers")
+            if density.get("maxArtWidth",999) > 37 or density.get("maxArtHeight",999) > 37: hard.append(r["profile"]+": mobile settlement artwork is still too large for the strategic map")
+            if density.get("minHitWidth",0) < 37 or density.get("minHitHeight",0) < 37: hard.append(r["profile"]+": compact settlement tap targets became too small")
+            if density.get("visibleLabelCount",99) > 8: hard.append(r["profile"]+": too many settlement labels are visible at once on the mobile full map")
             if not r["stages"]["1"].get("farmsInPanelView"): hard.append(r["profile"]+": Build shortcut did not bring Farms into view")
             if not r["stages"]["2"].get("militiaInPanelView"): hard.append(r["profile"]+": Recruit shortcut did not bring Militia into view")
             if not r["stages"]["4"].get("raidInPanelView"): hard.append(r["profile"]+": Actions shortcut did not bring Raid into view")
